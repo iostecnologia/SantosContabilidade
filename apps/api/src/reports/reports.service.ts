@@ -233,15 +233,11 @@ export class ReportsService {
         ${costCenterFilter}
       GROUP BY jel.account_id
     `;
-    const accountTypes = await this.tx.account.findMany({
-      where: { id: { in: resultRows.map((r) => r.accountId) }, organizationId },
-      select: { id: true, type: true },
-    });
-    const typeById = new Map(accountTypes.map((a) => [a.id, a.type]));
-    const netIncome = resultRows.reduce((sum, r) => {
-      const type = typeById.get(r.accountId);
-      return sum + (type === "REVENUE" ? -r.netDebit : r.netDebit);
-    }, 0);
+    // netIncome = receita - despesa = Σ(-netDebit_receita) - Σ(netDebit_despesa)
+    // = Σ(-netDebit) sobre TODAS as linhas, receita ou despesa — a subtração
+    // da despesa já é embutida no sinal, sem precisar ramificar por tipo (ao
+    // contrário do DRE, que exibe cada lado separado e por isso ramifica).
+    const netIncome = resultRows.reduce((sum, r) => sum - r.netDebit, 0);
 
     const accounts = await this.accountsFor(organizationId, balanceRows.map((r) => r.accountId));
     const lines = balanceRows

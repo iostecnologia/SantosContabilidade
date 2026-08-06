@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: santos_saf_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+      POSTGRES_DB: santos_saf
+    ports:
+      - "5432:5432"
+    volumes:
+      - santos_saf_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d santos_saf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: santos_saf_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://app_user:app_user_dev_password@postgres:5432/santos_saf?schema=public"
+      MIGRATE_DATABASE_URL: "postgresql://app_migrator:app_migrator_dev_password@postgres:5432/santos_saf?schema=public"
+      PORT: "3000"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET no .env da raiz do projeto}
+      JWT_ACCESS_TTL: "15m"
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET no .env da raiz do projeto}
+      JWT_REFRESH_TTL_DAYS: "7"
+    ports:
+      - "3000:3000"
+
+volumes:
+  santos_saf_pgdata:

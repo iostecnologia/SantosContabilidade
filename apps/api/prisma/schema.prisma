@@ -1,0 +1,505 @@
+// Fundação do Santos Sistema Administrativo Financeiro.
+// `url` é usado pelo client em runtime (papel app_user, restrito por RLS).
+// `directUrl` é usado só por `prisma migrate` (papel app_migrator, dono das tabelas).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("MIGRATE_DATABASE_URL")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum LineDirection {
+  DEBIT
+  CREDIT
+}
+
+enum CounterpartyType {
+  SUPPLIER
+  CUSTOMER
+  BOTH
+}
+
+enum BankAccountKind {
+  BANK
+  CASH
+}
+
+enum TitleStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CANCELED
+}
+
+enum FixedAssetStatus {
+  ACTIVE
+  FULLY_DEPRECIATED
+  DISPOSED
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  // Identificador público usado para resolver o tenant no login, antes de
+  // haver qualquer sessão autenticada — evita expor a tabela `users` sem
+  // contexto de organização já definido (ver módulo auth).
+  slug      String   @unique
+  name      String
+  taxId     String?  @unique @map("tax_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  roles         Role[]
+  costCenters   CostCenter[]
+  accounts      Account[]
+  journalEntries JournalEntry[]
+  counterparties            Counterparty[]
+  bankAccounts              BankAccount[]
+  accountsPayable           AccountsPayable[]
+  accountsPayablePayments   AccountsPayablePayment[]
+  accountsReceivable        AccountsReceivable[]
+  accountsReceivableReceipts AccountsReceivableReceipt[]
+  fixedAssets                 FixedAsset[]
+  fixedAssetDepreciationEntries FixedAssetDepreciationEntry[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  email          String
+  passwordHash   String   @map("password_hash")
+  fullName       String   @map("full_name")
+  isActive       Boolean  @default(true) @map("is_active")
+  // Incrementado sempre que papéis/permissões do usuário mudam; comparado
+  // contra o claim do JWT para permitir revogação quase-imediata sem sessão
+  // stateful por requisição.
+  securityStamp  Int      @default(0) @map("security_stamp")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+// Catálogo global de permissões (module:action). Não é dado de tenant — sem organization_id, sem RLS.
+model Permission {
+  id     String @id @default(uuid())
+  module String
+  action String
+  key    String @unique
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model Role {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  isSystem       Boolean  @default(false) @map("is_system")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+model RolePermission {
+  organizationId String @map("organization_id")
+  roleId         String @map("role_id")
+  permissionId   String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@index([organizationId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+  roleId         String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([organizationId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  tokenHash      String    @map("token_hash")
+  familyId       String    @map("family_id")
+  replacedById   String?   @map("replaced_by_id")
+  expiresAt      DateTime  @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model CostCenter {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  code           String
+  name           String
+  parentId       String?  @map("parent_id")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent             CostCenter?        @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children            CostCenter[]       @relation("CostCenterHierarchy")
+  accounts            Account[]
+  journalEntryLines   JournalEntryLine[]
+  accountsPayable     AccountsPayable[]
+  accountsReceivable  AccountsReceivable[]
+  fixedAssets         FixedAsset[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([organizationId, parentId])
+  @@map("cost_centers")
+}
+
+model Account {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  code           String
+  name           String
+  type           AccountType
+  parentId       String?     @map("parent_id")
+  // Mantido por trigger no banco (AFTER INSERT/UPDATE/DELETE em accounts) —
+  // nunca definido diretamente pela aplicação. Só contas analíticas (sem filhos) recebem lançamento.
+  isAnalytic     Boolean     @default(true) @map("is_analytic")
+  isActive       Boolean     @default(true) @map("is_active")
+  costCenterId   String?     @map("cost_center_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent             Account?           @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children            Account[]          @relation("AccountHierarchy")
+  costCenter          CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  journalEntryLines   JournalEntryLine[]
+  bankAccounts        BankAccount[]
+  apExpenseEntries    AccountsPayable[]           @relation("APExpenseAccount")
+  apLiabilityEntries  AccountsPayable[]           @relation("APLiabilityAccount")
+  arAssetEntries      AccountsReceivable[]        @relation("ARAssetAccount")
+  arRevenueEntries    AccountsReceivable[]        @relation("ARRevenueAccount")
+  fixedAssetsAsAsset          FixedAsset[]        @relation("FixedAssetAssetAccount")
+  fixedAssetsAsAccumDepr      FixedAsset[]        @relation("FixedAssetAccumDeprAccount")
+  fixedAssetsAsDeprExpense    FixedAsset[]        @relation("FixedAssetDeprExpenseAccount")
+  fixedAssetsAsLossOnDisposal FixedAsset[]        @relation("FixedAssetLossOnDisposalAccount")
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([organizationId, parentId])
+  @@map("accounts")
+}
+
+// Contador atômico por organização, usado para numerar lançamentos sem
+// buracos sob concorrência (ver migração de RLS/triggers para o padrão de incremento).
+model SequenceCounter {
+  organizationId String @map("organization_id")
+  counterKey     String @map("counter_key")
+  currentValue   BigInt @default(0) @map("current_value")
+
+  @@id([organizationId, counterKey])
+  @@map("sequence_counters")
+}
+
+model JournalEntry {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  entryNumber     BigInt   @map("entry_number")
+  entryDate       DateTime @map("entry_date") @db.Date
+  competenceDate  DateTime @map("competence_date") @db.Date
+  description     String
+  // Módulo de origem do lançamento (ex.: MANUAL, BANK, CASH, AP, AR, FIXED_ASSET, FISCAL).
+  // String livre (não enum) para que novos módulos não exijam migração de schema.
+  referenceModule String   @default("MANUAL") @map("reference_module")
+  referenceId     String?  @map("reference_id")
+  reversalOfId    String?  @map("reversal_of_id")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lines        JournalEntryLine[]
+  accountsPayableAccruals    AccountsPayable[]
+  accountsReceivableAccruals AccountsReceivable[]
+  accountsPayablePayments    AccountsPayablePayment[]
+  accountsReceivableReceipts AccountsReceivableReceipt[]
+  fixedAssetDisposals            FixedAsset[]                  @relation("FixedAssetDisposal")
+  fixedAssetDepreciationEntries  FixedAssetDepreciationEntry[] @relation("FixedAssetDepreciationPosting")
+
+  @@unique([organizationId, entryNumber])
+  @@index([organizationId, entryDate])
+  @@index([organizationId, competenceDate])
+  @@map("journal_entries")
+}
+
+model JournalEntryLine {
+  id             String        @id @default(uuid())
+  // Denormalizado do header para que a policy de RLS seja uma comparação direta, sem join.
+  organizationId String        @map("organization_id")
+  journalEntryId String        @map("journal_entry_id")
+  accountId      String        @map("account_id")
+  costCenterId   String?       @map("cost_center_id")
+  direction      LineDirection
+  amount         Decimal       @db.Decimal(18, 2)
+  lineNumber     Int           @map("line_number")
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@map("journal_entry_lines")
+}
+
+model Counterparty {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  type           CounterpartyType
+  taxId          String?          @map("tax_id")
+  name           String
+  email          String?
+  phone          String?
+  isActive       Boolean          @default(true) @map("is_active")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  accountsPayable     AccountsPayable[]
+  accountsReceivable  AccountsReceivable[]
+
+  @@unique([organizationId, taxId])
+  @@index([organizationId])
+  @@map("counterparties")
+}
+
+model BankAccount {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  kind           BankAccountKind
+  name           String
+  bankCode       String?         @map("bank_code")
+  agency         String?
+  accountNumber  String?         @map("account_number")
+  glAccountId    String          @map("gl_account_id")
+  isActive       Boolean         @default(true) @map("is_active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  glAccount    Account                     @relation(fields: [glAccountId], references: [id], onDelete: Restrict)
+  payments     AccountsPayablePayment[]
+  receipts     AccountsReceivableReceipt[]
+
+  @@index([organizationId])
+  @@map("bank_accounts")
+}
+
+model AccountsPayable {
+  id                    String      @id @default(uuid())
+  organizationId        String      @map("organization_id")
+  documentNumber        BigInt      @map("document_number")
+  counterpartyId        String      @map("counterparty_id")
+  description           String
+  issueDate             DateTime    @map("issue_date") @db.Date
+  dueDate               DateTime    @map("due_date") @db.Date
+  competenceDate        DateTime    @map("competence_date") @db.Date
+  originalAmount        Decimal     @db.Decimal(18, 2) @map("original_amount")
+  paidAmount            Decimal     @default(0) @db.Decimal(18, 2) @map("paid_amount")
+  expenseAccountId      String      @map("expense_account_id")
+  liabilityAccountId    String      @map("liability_account_id")
+  costCenterId          String?     @map("cost_center_id")
+  status                TitleStatus @default(OPEN)
+  accrualJournalEntryId String      @map("accrual_journal_entry_id")
+  createdBy             String      @map("created_by")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  counterparty         Counterparty             @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  expenseAccount       Account                  @relation("APExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  liabilityAccount     Account                  @relation("APLiabilityAccount", fields: [liabilityAccountId], references: [id], onDelete: Restrict)
+  costCenter           CostCenter?              @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accrualJournalEntry  JournalEntry             @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
+  payments             AccountsPayablePayment[]
+
+  @@unique([organizationId, documentNumber])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, counterpartyId])
+  @@map("accounts_payable")
+}
+
+model AccountsPayablePayment {
+  id                String   @id @default(uuid())
+  organizationId    String   @map("organization_id")
+  accountsPayableId String   @map("accounts_payable_id")
+  paymentDate       DateTime @map("payment_date") @db.Date
+  amount            Decimal  @db.Decimal(18, 2)
+  bankAccountId     String   @map("bank_account_id")
+  journalEntryId    String   @map("journal_entry_id")
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  accountsPayable AccountsPayable @relation(fields: [accountsPayableId], references: [id], onDelete: Restrict)
+  bankAccount     BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journalEntry    JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([accountsPayableId])
+  @@map("accounts_payable_payments")
+}
+
+model AccountsReceivable {
+  id                    String      @id @default(uuid())
+  organizationId        String      @map("organization_id")
+  documentNumber        BigInt      @map("document_number")
+  counterpartyId        String      @map("counterparty_id")
+  description           String
+  issueDate             DateTime    @map("issue_date") @db.Date
+  dueDate               DateTime    @map("due_date") @db.Date
+  competenceDate        DateTime    @map("competence_date") @db.Date
+  originalAmount        Decimal     @db.Decimal(18, 2) @map("original_amount")
+  receivedAmount        Decimal     @default(0) @db.Decimal(18, 2) @map("received_amount")
+  assetAccountId        String      @map("asset_account_id")
+  revenueAccountId      String      @map("revenue_account_id")
+  costCenterId          String?     @map("cost_center_id")
+  status                TitleStatus @default(OPEN)
+  accrualJournalEntryId String      @map("accrual_journal_entry_id")
+  createdBy             String      @map("created_by")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  counterparty         Counterparty                @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  assetAccount         Account                     @relation("ARAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
+  revenueAccount       Account                     @relation("ARRevenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  costCenter           CostCenter?                 @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accrualJournalEntry  JournalEntry                @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
+  receipts             AccountsReceivableReceipt[]
+
+  @@unique([organizationId, documentNumber])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, counterpartyId])
+  @@map("accounts_receivable")
+}
+
+model AccountsReceivableReceipt {
+  id                   String   @id @default(uuid())
+  organizationId       String   @map("organization_id")
+  accountsReceivableId String   @map("accounts_receivable_id")
+  receiptDate          DateTime @map("receipt_date") @db.Date
+  amount               Decimal  @db.Decimal(18, 2)
+  bankAccountId        String   @map("bank_account_id")
+  journalEntryId       String   @map("journal_entry_id")
+  createdBy            String   @map("created_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  accountsReceivable AccountsReceivable @relation(fields: [accountsReceivableId], references: [id], onDelete: Restrict)
+  bankAccount        BankAccount        @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journalEntry       JournalEntry       @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([accountsReceivableId])
+  @@map("accounts_receivable_receipts")
+}
+
+model FixedAsset {
+  id                               String           @id @default(uuid())
+  organizationId                   String           @map("organization_id")
+  assetNumber                      BigInt           @map("asset_number")
+  description                      String
+  acquisitionDate                  DateTime         @map("acquisition_date") @db.Date
+  acquisitionCost                  Decimal          @db.Decimal(18, 2) @map("acquisition_cost")
+  residualValue                    Decimal          @default(0) @db.Decimal(18, 2) @map("residual_value")
+  usefulLifeMonths                 Int              @map("useful_life_months")
+  accumulatedDepreciation          Decimal          @default(0) @db.Decimal(18, 2) @map("accumulated_depreciation")
+  assetAccountId                   String           @map("asset_account_id")
+  accumulatedDepreciationAccountId String           @map("accumulated_depreciation_account_id")
+  depreciationExpenseAccountId     String           @map("depreciation_expense_account_id")
+  costCenterId                     String?          @map("cost_center_id")
+  status                           FixedAssetStatus @default(ACTIVE)
+  disposalDate                     DateTime?        @map("disposal_date") @db.Date
+  disposalJournalEntryId           String?          @map("disposal_journal_entry_id")
+  lossOnDisposalAccountId          String?          @map("loss_on_disposal_account_id")
+  createdBy                        String           @map("created_by")
+  createdAt                        DateTime         @default(now()) @map("created_at")
+  updatedAt                        DateTime         @updatedAt @map("updated_at")
+
+  organization                    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assetAccount                    Account                       @relation("FixedAssetAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
+  accumulatedDepreciationAccount  Account                       @relation("FixedAssetAccumDeprAccount", fields: [accumulatedDepreciationAccountId], references: [id], onDelete: Restrict)
+  depreciationExpenseAccount      Account                       @relation("FixedAssetDeprExpenseAccount", fields: [depreciationExpenseAccountId], references: [id], onDelete: Restrict)
+  lossOnDisposalAccount           Account?                      @relation("FixedAssetLossOnDisposalAccount", fields: [lossOnDisposalAccountId], references: [id], onDelete: Restrict)
+  costCenter                      CostCenter?                   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  disposalJournalEntry            JournalEntry?                 @relation("FixedAssetDisposal", fields: [disposalJournalEntryId], references: [id], onDelete: Restrict)
+  depreciationEntries             FixedAssetDepreciationEntry[]
+
+  @@unique([organizationId, assetNumber])
+  @@index([organizationId, status])
+  @@map("fixed_assets")
+}
+
+model FixedAssetDepreciationEntry {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  fixedAssetId    String   @map("fixed_asset_id")
+  competenceMonth DateTime @map("competence_month") @db.Date
+  amount          Decimal  @db.Decimal(18, 2)
+  journalEntryId  String   @map("journal_entry_id")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fixedAsset   FixedAsset   @relation(fields: [fixedAssetId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry @relation("FixedAssetDepreciationPosting", fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, fixedAssetId, competenceMonth])
+  @@map("fixed_asset_depreciation_entries")
+}

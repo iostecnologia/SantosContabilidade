@@ -3,6 +3,10 @@
 #   docker build -f apps/api/Dockerfile -t santos-saf-api .
 
 FROM node:20-alpine AS deps
+# O engine do Prisma precisa de libssl em runtime; node:20-alpine não traz
+# openssl instalado por padrão (sem isso, o engine falha ao carregar e o
+# Prisma nem consegue reportar um erro em JSON legível).
+RUN apk add --no-cache openssl
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
@@ -15,6 +19,7 @@ RUN npm run prisma:generate -w apps/api
 RUN npm run api:build
 
 FROM node:20-alpine AS runtime
+RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 WORKDIR /repo
 # npm workspaces faz hoist das dependências pra node_modules da raiz — não

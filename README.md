@@ -21,7 +21,9 @@ Isolamento entre empresas é garantido pelo **Postgres**, não só por `WHERE or
 
 ```bash
 cp .env.example .env
-# edite .env e gere segredos fortes: openssl rand -base64 48
+# edite .env e gere segredos fortes pra JWT_ACCESS_SECRET, JWT_REFRESH_SECRET,
+# POSTGRES_SUPERUSER_PASSWORD, APP_MIGRATOR_PASSWORD e APP_USER_PASSWORD:
+#   openssl rand -base64 48
 
 docker-compose up -d postgres
 # espere o healthcheck ficar "healthy" (docker-compose ps)
@@ -39,7 +41,8 @@ npm run api:dev           # http://localhost:3000, Swagger em /api/docs
 
 ```bash
 cp .env.example .env
-# gere JWT_ACCESS_SECRET e JWT_REFRESH_SECRET fortes em .env
+# gere segredos fortes pra TODAS as variáveis do .env (JWT_*, POSTGRES_SUPERUSER_PASSWORD,
+# APP_MIGRATOR_PASSWORD, APP_USER_PASSWORD): openssl rand -base64 48
 
 docker-compose up -d postgres
 # espere ficar healthy
@@ -51,7 +54,7 @@ docker-compose run --rm api npm run prisma:seed -w apps/api
 docker-compose up -d api
 ```
 
-**Antes de ir para produção de verdade**, troque as senhas de banco hardcoded em `docker/postgres-init/01-roles.sql` (`app_migrator_dev_password`, `app_user_dev_password`) e no `docker-compose.yml`, mantendo as duas em sincronia — são placeholders de desenvolvimento.
+As senhas do Postgres (`POSTGRES_SUPERUSER_PASSWORD`, `APP_MIGRATOR_PASSWORD`, `APP_USER_PASSWORD`) vêm só do `.env` (gitignored) — nunca hardcode em `docker/postgres-init/01-roles.sh` nem em `docker-compose.yml`, já que este repositório é público.
 
 O `Dockerfile` (`apps/api/Dockerfile`) e o serviço `api` do `docker-compose.yml` não foram testados com um build real neste ambiente (sem Docker disponível aqui) — foram escritos com cuidado seguindo o padrão de monorepo com npm workspaces, mas vale conferir o primeiro `docker-compose build api` no seu VPS.
 

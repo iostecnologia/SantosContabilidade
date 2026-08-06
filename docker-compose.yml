@@ -5,8 +5,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?defina POSTGRES_SUPERUSER_PASSWORD no .env da raiz do projeto}
       POSTGRES_DB: santos_saf
+      APP_MIGRATOR_PASSWORD: ${APP_MIGRATOR_PASSWORD:?defina APP_MIGRATOR_PASSWORD no .env da raiz do projeto}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?defina APP_USER_PASSWORD no .env da raiz do projeto}
     ports:
       - "5432:5432"
     volumes:
@@ -28,8 +30,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgresql://app_user:app_user_dev_password@postgres:5432/santos_saf?schema=public"
-      MIGRATE_DATABASE_URL: "postgresql://app_migrator:app_migrator_dev_password@postgres:5432/santos_saf?schema=public"
+      DATABASE_URL: "postgresql://app_user:${APP_USER_PASSWORD:?defina APP_USER_PASSWORD no .env da raiz do projeto}@postgres:5432/santos_saf?schema=public"
+      MIGRATE_DATABASE_URL: "postgresql://app_migrator:${APP_MIGRATOR_PASSWORD:?defina APP_MIGRATOR_PASSWORD no .env da raiz do projeto}@postgres:5432/santos_saf?schema=public"
       PORT: "3000"
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET no .env da raiz do projeto}
       JWT_ACCESS_TTL: "15m"

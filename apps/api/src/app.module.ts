@@ -14,6 +14,7 @@ import { BankAccountsModule } from "./bank-accounts/bank-accounts.module";
 import { AccountsPayableModule } from "./accounts-payable/accounts-payable.module";
 import { AccountsReceivableModule } from "./accounts-receivable/accounts-receivable.module";
 import { FixedAssetsModule } from "./fixed-assets/fixed-assets.module";
+import { BudgetModule } from "./budget/budget.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { FixedAssetsModule } from "./fixed-assets/fixed-assets.module";
     AccountsPayableModule,
     AccountsReceivableModule,
     FixedAssetsModule,
+    BudgetModule,
   ],
 })
 export class AppModule {}

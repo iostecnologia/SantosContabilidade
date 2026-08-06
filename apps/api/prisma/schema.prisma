@@ -48,6 +48,12 @@ enum FixedAssetStatus {
   DISPOSED
 }
 
+enum BudgetStatus {
+  DRAFT
+  APPROVED
+  CLOSED
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -60,19 +66,21 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users         User[]
-  roles         Role[]
-  costCenters   CostCenter[]
-  accounts      Account[]
-  journalEntries JournalEntry[]
-  counterparties            Counterparty[]
-  bankAccounts              BankAccount[]
-  accountsPayable           AccountsPayable[]
-  accountsPayablePayments   AccountsPayablePayment[]
-  accountsReceivable        AccountsReceivable[]
-  accountsReceivableReceipts AccountsReceivableReceipt[]
-  fixedAssets                 FixedAsset[]
+  users                         User[]
+  roles                         Role[]
+  costCenters                   CostCenter[]
+  accounts                      Account[]
+  journalEntries                JournalEntry[]
+  counterparties                Counterparty[]
+  bankAccounts                  BankAccount[]
+  accountsPayable               AccountsPayable[]
+  accountsPayablePayments       AccountsPayablePayment[]
+  accountsReceivable            AccountsReceivable[]
+  accountsReceivableReceipts    AccountsReceivableReceipt[]
+  fixedAssets                   FixedAsset[]
   fixedAssetDepreciationEntries FixedAssetDepreciationEntry[]
+  budgetPlans                   BudgetPlan[]
+  budgetLines                   BudgetLine[]
 
   @@map("organizations")
 }
@@ -184,14 +192,15 @@ model CostCenter {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  parent             CostCenter?        @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children            CostCenter[]       @relation("CostCenterHierarchy")
-  accounts            Account[]
-  journalEntryLines   JournalEntryLine[]
-  accountsPayable     AccountsPayable[]
-  accountsReceivable  AccountsReceivable[]
-  fixedAssets         FixedAsset[]
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent             CostCenter?          @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children           CostCenter[]         @relation("CostCenterHierarchy")
+  accounts           Account[]
+  journalEntryLines  JournalEntryLine[]
+  accountsPayable    AccountsPayable[]
+  accountsReceivable AccountsReceivable[]
+  fixedAssets        FixedAsset[]
+  budgetLines        BudgetLine[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -214,20 +223,21 @@ model Account {
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  parent             Account?           @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children            Account[]          @relation("AccountHierarchy")
-  costCenter          CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  journalEntryLines   JournalEntryLine[]
-  bankAccounts        BankAccount[]
-  apExpenseEntries    AccountsPayable[]           @relation("APExpenseAccount")
-  apLiabilityEntries  AccountsPayable[]           @relation("APLiabilityAccount")
-  arAssetEntries      AccountsReceivable[]        @relation("ARAssetAccount")
-  arRevenueEntries    AccountsReceivable[]        @relation("ARRevenueAccount")
-  fixedAssetsAsAsset          FixedAsset[]        @relation("FixedAssetAssetAccount")
-  fixedAssetsAsAccumDepr      FixedAsset[]        @relation("FixedAssetAccumDeprAccount")
-  fixedAssetsAsDeprExpense    FixedAsset[]        @relation("FixedAssetDeprExpenseAccount")
-  fixedAssetsAsLossOnDisposal FixedAsset[]        @relation("FixedAssetLossOnDisposalAccount")
+  organization                Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent                      Account?             @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children                    Account[]            @relation("AccountHierarchy")
+  costCenter                  CostCenter?          @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  journalEntryLines           JournalEntryLine[]
+  bankAccounts                BankAccount[]
+  apExpenseEntries            AccountsPayable[]    @relation("APExpenseAccount")
+  apLiabilityEntries          AccountsPayable[]    @relation("APLiabilityAccount")
+  arAssetEntries              AccountsReceivable[] @relation("ARAssetAccount")
+  arRevenueEntries            AccountsReceivable[] @relation("ARRevenueAccount")
+  fixedAssetsAsAsset          FixedAsset[]         @relation("FixedAssetAssetAccount")
+  fixedAssetsAsAccumDepr      FixedAsset[]         @relation("FixedAssetAccumDeprAccount")
+  fixedAssetsAsDeprExpense    FixedAsset[]         @relation("FixedAssetDeprExpenseAccount")
+  fixedAssetsAsLossOnDisposal FixedAsset[]         @relation("FixedAssetLossOnDisposalAccount")
+  budgetLines                 BudgetLine[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -261,14 +271,14 @@ model JournalEntry {
   createdBy       String   @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  lines        JournalEntryLine[]
-  accountsPayableAccruals    AccountsPayable[]
-  accountsReceivableAccruals AccountsReceivable[]
-  accountsPayablePayments    AccountsPayablePayment[]
-  accountsReceivableReceipts AccountsReceivableReceipt[]
-  fixedAssetDisposals            FixedAsset[]                  @relation("FixedAssetDisposal")
-  fixedAssetDepreciationEntries  FixedAssetDepreciationEntry[] @relation("FixedAssetDepreciationPosting")
+  organization                  Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lines                         JournalEntryLine[]
+  accountsPayableAccruals       AccountsPayable[]
+  accountsReceivableAccruals    AccountsReceivable[]
+  accountsPayablePayments       AccountsPayablePayment[]
+  accountsReceivableReceipts    AccountsReceivableReceipt[]
+  fixedAssetDisposals           FixedAsset[]                  @relation("FixedAssetDisposal")
+  fixedAssetDepreciationEntries FixedAssetDepreciationEntry[] @relation("FixedAssetDepreciationPosting")
 
   @@unique([organizationId, entryNumber])
   @@index([organizationId, entryDate])
@@ -310,8 +320,8 @@ model Counterparty {
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
   organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  accountsPayable     AccountsPayable[]
-  accountsReceivable  AccountsReceivable[]
+  accountsPayable    AccountsPayable[]
+  accountsReceivable AccountsReceivable[]
 
   @@unique([organizationId, taxId])
   @@index([organizationId])
@@ -349,8 +359,8 @@ model AccountsPayable {
   issueDate             DateTime    @map("issue_date") @db.Date
   dueDate               DateTime    @map("due_date") @db.Date
   competenceDate        DateTime    @map("competence_date") @db.Date
-  originalAmount        Decimal     @db.Decimal(18, 2) @map("original_amount")
-  paidAmount            Decimal     @default(0) @db.Decimal(18, 2) @map("paid_amount")
+  originalAmount        Decimal     @map("original_amount") @db.Decimal(18, 2)
+  paidAmount            Decimal     @default(0) @map("paid_amount") @db.Decimal(18, 2)
   expenseAccountId      String      @map("expense_account_id")
   liabilityAccountId    String      @map("liability_account_id")
   costCenterId          String?     @map("cost_center_id")
@@ -361,12 +371,12 @@ model AccountsPayable {
   updatedAt             DateTime    @updatedAt @map("updated_at")
 
   organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  counterparty         Counterparty             @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
-  expenseAccount       Account                  @relation("APExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
-  liabilityAccount     Account                  @relation("APLiabilityAccount", fields: [liabilityAccountId], references: [id], onDelete: Restrict)
-  costCenter           CostCenter?              @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accrualJournalEntry  JournalEntry             @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
-  payments             AccountsPayablePayment[]
+  counterparty        Counterparty             @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  expenseAccount      Account                  @relation("APExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  liabilityAccount    Account                  @relation("APLiabilityAccount", fields: [liabilityAccountId], references: [id], onDelete: Restrict)
+  costCenter          CostCenter?              @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accrualJournalEntry JournalEntry             @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
+  payments            AccountsPayablePayment[]
 
   @@unique([organizationId, documentNumber])
   @@index([organizationId, status, dueDate])
@@ -404,8 +414,8 @@ model AccountsReceivable {
   issueDate             DateTime    @map("issue_date") @db.Date
   dueDate               DateTime    @map("due_date") @db.Date
   competenceDate        DateTime    @map("competence_date") @db.Date
-  originalAmount        Decimal     @db.Decimal(18, 2) @map("original_amount")
-  receivedAmount        Decimal     @default(0) @db.Decimal(18, 2) @map("received_amount")
+  originalAmount        Decimal     @map("original_amount") @db.Decimal(18, 2)
+  receivedAmount        Decimal     @default(0) @map("received_amount") @db.Decimal(18, 2)
   assetAccountId        String      @map("asset_account_id")
   revenueAccountId      String      @map("revenue_account_id")
   costCenterId          String?     @map("cost_center_id")
@@ -416,12 +426,12 @@ model AccountsReceivable {
   updatedAt             DateTime    @updatedAt @map("updated_at")
 
   organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  counterparty         Counterparty                @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
-  assetAccount         Account                     @relation("ARAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
-  revenueAccount       Account                     @relation("ARRevenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
-  costCenter           CostCenter?                 @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accrualJournalEntry  JournalEntry                @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
-  receipts             AccountsReceivableReceipt[]
+  counterparty        Counterparty                @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  assetAccount        Account                     @relation("ARAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
+  revenueAccount      Account                     @relation("ARRevenueAccount", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  costCenter          CostCenter?                 @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accrualJournalEntry JournalEntry                @relation(fields: [accrualJournalEntryId], references: [id], onDelete: Restrict)
+  receipts            AccountsReceivableReceipt[]
 
   @@unique([organizationId, documentNumber])
   @@index([organizationId, status, dueDate])
@@ -456,10 +466,10 @@ model FixedAsset {
   assetNumber                      BigInt           @map("asset_number")
   description                      String
   acquisitionDate                  DateTime         @map("acquisition_date") @db.Date
-  acquisitionCost                  Decimal          @db.Decimal(18, 2) @map("acquisition_cost")
-  residualValue                    Decimal          @default(0) @db.Decimal(18, 2) @map("residual_value")
+  acquisitionCost                  Decimal          @map("acquisition_cost") @db.Decimal(18, 2)
+  residualValue                    Decimal          @default(0) @map("residual_value") @db.Decimal(18, 2)
   usefulLifeMonths                 Int              @map("useful_life_months")
-  accumulatedDepreciation          Decimal          @default(0) @db.Decimal(18, 2) @map("accumulated_depreciation")
+  accumulatedDepreciation          Decimal          @default(0) @map("accumulated_depreciation") @db.Decimal(18, 2)
   assetAccountId                   String           @map("asset_account_id")
   accumulatedDepreciationAccountId String           @map("accumulated_depreciation_account_id")
   depreciationExpenseAccountId     String           @map("depreciation_expense_account_id")
@@ -472,14 +482,14 @@ model FixedAsset {
   createdAt                        DateTime         @default(now()) @map("created_at")
   updatedAt                        DateTime         @updatedAt @map("updated_at")
 
-  organization                    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  assetAccount                    Account                       @relation("FixedAssetAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
-  accumulatedDepreciationAccount  Account                       @relation("FixedAssetAccumDeprAccount", fields: [accumulatedDepreciationAccountId], references: [id], onDelete: Restrict)
-  depreciationExpenseAccount      Account                       @relation("FixedAssetDeprExpenseAccount", fields: [depreciationExpenseAccountId], references: [id], onDelete: Restrict)
-  lossOnDisposalAccount           Account?                      @relation("FixedAssetLossOnDisposalAccount", fields: [lossOnDisposalAccountId], references: [id], onDelete: Restrict)
-  costCenter                      CostCenter?                   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  disposalJournalEntry            JournalEntry?                 @relation("FixedAssetDisposal", fields: [disposalJournalEntryId], references: [id], onDelete: Restrict)
-  depreciationEntries             FixedAssetDepreciationEntry[]
+  organization                   Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assetAccount                   Account                       @relation("FixedAssetAssetAccount", fields: [assetAccountId], references: [id], onDelete: Restrict)
+  accumulatedDepreciationAccount Account                       @relation("FixedAssetAccumDeprAccount", fields: [accumulatedDepreciationAccountId], references: [id], onDelete: Restrict)
+  depreciationExpenseAccount     Account                       @relation("FixedAssetDeprExpenseAccount", fields: [depreciationExpenseAccountId], references: [id], onDelete: Restrict)
+  lossOnDisposalAccount          Account?                      @relation("FixedAssetLossOnDisposalAccount", fields: [lossOnDisposalAccountId], references: [id], onDelete: Restrict)
+  costCenter                     CostCenter?                   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  disposalJournalEntry           JournalEntry?                 @relation("FixedAssetDisposal", fields: [disposalJournalEntryId], references: [id], onDelete: Restrict)
+  depreciationEntries            FixedAssetDepreciationEntry[]
 
   @@unique([organizationId, assetNumber])
   @@index([organizationId, status])
@@ -502,4 +512,53 @@ model FixedAssetDepreciationEntry {
 
   @@unique([organizationId, fixedAssetId, competenceMonth])
   @@map("fixed_asset_depreciation_entries")
+}
+
+// Orçamento é razão auxiliar de planejamento — não posta lançamento algum
+// (mesma lógica de FixedAsset: comparação, não geração de partidas). Um
+// BudgetPlan é imutável quanto a nome/ano fora do estado DRAFT; suas linhas
+// só podem ser criadas/editadas/removidas enquanto o plano está em DRAFT
+// (garantido na camada de aplicação, ver BudgetService — não há REVOKE de
+// UPDATE/DELETE no banco porque, ao contrário de lançamentos e pagamentos,
+// a edição é legítima durante o rascunho).
+model BudgetPlan {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  fiscalYear     Int          @map("fiscal_year")
+  name           String
+  status         BudgetStatus @default(DRAFT)
+  approvedBy     String?      @map("approved_by")
+  approvedAt     DateTime?    @map("approved_at")
+  closedAt       DateTime?    @map("closed_at")
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lines        BudgetLine[]
+
+  @@index([organizationId, fiscalYear])
+  @@map("budget_plans")
+}
+
+model BudgetLine {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  budgetPlanId   String   @map("budget_plan_id")
+  accountId      String   @map("account_id")
+  costCenterId   String   @map("cost_center_id")
+  // 1 a 12 — validado no DTO e reforçado por CHECK constraint na migração de RLS.
+  month          Int
+  amount         Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  budgetPlan   BudgetPlan   @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, budgetPlanId, accountId, costCenterId, month])
+  @@index([organizationId, budgetPlanId])
+  @@map("budget_lines")
 }

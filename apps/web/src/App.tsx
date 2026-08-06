@@ -8,6 +8,7 @@ import { CostCentersPage } from "./pages/cost-centers/CostCentersPage";
 import { AccountsPage } from "./pages/accounts/AccountsPage";
 import { JournalEntriesPage } from "./pages/journal-entries/JournalEntriesPage";
 import { FinanceiroPage } from "./pages/financeiro/FinanceiroPage";
+import { BudgetPage } from "./pages/budget/BudgetPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -59,6 +60,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <FinanceiroPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/budget"
+        element={
+          <ProtectedRoute>
+            <BudgetPage />
           </ProtectedRoute>
         }
       />

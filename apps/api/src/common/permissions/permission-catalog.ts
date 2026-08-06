@@ -63,6 +63,13 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "fixed_assets", action: "delete" },
   { module: "fixed_assets", action: "dispose" },
   { module: "fixed_assets", action: "run_depreciation" },
+
+  { module: "budget", action: "create" },
+  { module: "budget", action: "read" },
+  { module: "budget", action: "update" },
+  { module: "budget", action: "delete" },
+  { module: "budget", action: "approve" },
+  { module: "budget", action: "close" },
 ];
 
 export function permissionKey(module: string, action: string): string {

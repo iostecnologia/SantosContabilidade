@@ -114,7 +114,7 @@ export class AccountsReceivableService {
     const guardRows = await this.tx.$queryRaw<{ received_amount: unknown; status: string }[]>`
       UPDATE accounts_receivable
       SET received_amount = received_amount + ${dto.amount},
-          status = CASE WHEN received_amount + ${dto.amount} >= original_amount THEN 'PAID' ELSE 'PARTIALLY_PAID' END,
+          status = CASE WHEN received_amount + ${dto.amount} >= original_amount THEN 'PAID'::"TitleStatus" ELSE 'PARTIALLY_PAID'::"TitleStatus" END,
           updated_at = now()
       WHERE id = ${id} AND organization_id = ${organizationId}
         AND status <> 'CANCELED'

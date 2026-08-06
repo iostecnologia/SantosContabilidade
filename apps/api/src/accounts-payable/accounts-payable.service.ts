@@ -120,7 +120,7 @@ export class AccountsPayableService {
     const guardRows = await this.tx.$queryRaw<{ paid_amount: unknown; status: string }[]>`
       UPDATE accounts_payable
       SET paid_amount = paid_amount + ${dto.amount},
-          status = CASE WHEN paid_amount + ${dto.amount} >= original_amount THEN 'PAID' ELSE 'PARTIALLY_PAID' END,
+          status = CASE WHEN paid_amount + ${dto.amount} >= original_amount THEN 'PAID'::"TitleStatus" ELSE 'PARTIALLY_PAID'::"TitleStatus" END,
           updated_at = now()
       WHERE id = ${id} AND organization_id = ${organizationId}
         AND status <> 'CANCELED'

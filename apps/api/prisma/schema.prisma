@@ -54,6 +54,11 @@ enum BudgetStatus {
   CLOSED
 }
 
+enum StockMovementType {
+  INBOUND
+  OUTBOUND
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -81,6 +86,11 @@ model Organization {
   fixedAssetDepreciationEntries FixedAssetDepreciationEntry[]
   budgetPlans                   BudgetPlan[]
   budgetLines                   BudgetLine[]
+  warehouses                    Warehouse[]
+  inventoryItems                InventoryItem[]
+  warehouseStocks               WarehouseStock[]
+  stockMovements                StockMovement[]
+  stockTransfers                StockTransfer[]
 
   @@map("organizations")
 }
@@ -238,6 +248,8 @@ model Account {
   fixedAssetsAsDeprExpense    FixedAsset[]         @relation("FixedAssetDeprExpenseAccount")
   fixedAssetsAsLossOnDisposal FixedAsset[]         @relation("FixedAssetLossOnDisposalAccount")
   budgetLines                 BudgetLine[]
+  inventoryItems              InventoryItem[]      @relation("InventoryItemAccount")
+  stockMovementsAsCounter     StockMovement[]      @relation("StockMovementCounterAccount")
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -279,6 +291,7 @@ model JournalEntry {
   accountsReceivableReceipts    AccountsReceivableReceipt[]
   fixedAssetDisposals           FixedAsset[]                  @relation("FixedAssetDisposal")
   fixedAssetDepreciationEntries FixedAssetDepreciationEntry[] @relation("FixedAssetDepreciationPosting")
+  stockMovements                StockMovement[]
 
   @@unique([organizationId, entryNumber])
   @@index([organizationId, entryDate])
@@ -561,4 +574,126 @@ model BudgetLine {
   @@unique([organizationId, budgetPlanId, accountId, costCenterId, month])
   @@index([organizationId, budgetPlanId])
   @@map("budget_lines")
+}
+
+model Warehouse {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  code           String
+  name           String
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  stocks        WarehouseStock[]
+  movements     StockMovement[]
+  transfersFrom StockTransfer[]  @relation("TransferFromWarehouse")
+  transfersTo   StockTransfer[]  @relation("TransferToWarehouse")
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("warehouses")
+}
+
+// Custeio por média ponderada móvel, global por item (não por depósito) —
+// custo médio é um único número recalculado a cada entrada; depósitos só
+// segmentam ONDE fisicamente o item está (WarehouseStock), não a que custo.
+// Transferência entre depósitos, portanto, nunca muda average_cost/
+// total_quantity nem posta lançamento (mesma conta contábil de estoque nos
+// dois lados) — só redistribui quantidade entre WarehouseStock.
+model InventoryItem {
+  id                 String   @id @default(uuid())
+  organizationId     String   @map("organization_id")
+  code               String
+  name               String
+  unit               String
+  inventoryAccountId String   @map("inventory_account_id")
+  averageCost        Decimal  @default(0) @map("average_cost") @db.Decimal(18, 4)
+  totalQuantity      Decimal  @default(0) @map("total_quantity") @db.Decimal(18, 3)
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  inventoryAccount Account          @relation("InventoryItemAccount", fields: [inventoryAccountId], references: [id], onDelete: Restrict)
+  stocks           WarehouseStock[]
+  movements        StockMovement[]
+  transfers        StockTransfer[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("inventory_items")
+}
+
+model WarehouseStock {
+  id             String  @id @default(uuid())
+  organizationId String  @map("organization_id")
+  itemId         String  @map("item_id")
+  warehouseId    String  @map("warehouse_id")
+  quantity       Decimal @default(0) @db.Decimal(18, 3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, itemId, warehouseId])
+  @@index([organizationId, warehouseId])
+  @@map("warehouse_stock")
+}
+
+// Apêndice imutável do item, mesmo padrão de accounts_payable_payments/
+// fixed_asset_depreciation_entries (ver migração de RLS): entrada/saída
+// sempre posta lançamento (débito/crédito na conta de estoque do item) e
+// nunca é editada/removida depois — correção é sempre por um novo movimento
+// em sentido contrário, nunca edição do histórico.
+model StockMovement {
+  id               String            @id @default(uuid())
+  organizationId   String            @map("organization_id")
+  itemId           String            @map("item_id")
+  warehouseId      String            @map("warehouse_id")
+  type             StockMovementType
+  quantity         Decimal           @db.Decimal(18, 3)
+  // Para INBOUND, o custo informado no lançamento; para OUTBOUND, uma cópia
+  // do average_cost do item NO MOMENTO do movimento (auditoria — o item
+  // pode ter um average_cost diferente depois de entradas futuras).
+  unitCost         Decimal           @map("unit_cost") @db.Decimal(18, 4)
+  totalCost        Decimal           @map("total_cost") @db.Decimal(18, 2)
+  counterAccountId String            @map("counter_account_id")
+  movementDate     DateTime          @map("movement_date") @db.Date
+  journalEntryId   String            @map("journal_entry_id")
+  createdBy        String            @map("created_by")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  item           InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  warehouse      Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  counterAccount Account       @relation("StockMovementCounterAccount", fields: [counterAccountId], references: [id], onDelete: Restrict)
+  journalEntry   JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, itemId])
+  @@index([organizationId, warehouseId])
+  @@map("stock_movements")
+}
+
+// Também imutável (mesmo padrão de StockMovement) — não posta lançamento
+// (ver comentário em InventoryItem) nem muda custo/quantidade total do item.
+model StockTransfer {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  itemId          String   @map("item_id")
+  fromWarehouseId String   @map("from_warehouse_id")
+  toWarehouseId   String   @map("to_warehouse_id")
+  quantity        Decimal  @db.Decimal(18, 3)
+  transferDate    DateTime @map("transfer_date") @db.Date
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  fromWarehouse Warehouse     @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse     @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, itemId])
+  @@map("stock_transfers")
 }

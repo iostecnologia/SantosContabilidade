@@ -70,6 +70,17 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "budget", action: "delete" },
   { module: "budget", action: "approve" },
   { module: "budget", action: "close" },
+
+  { module: "warehouses", action: "create" },
+  { module: "warehouses", action: "read" },
+  { module: "warehouses", action: "update" },
+
+  { module: "inventory_items", action: "create" },
+  { module: "inventory_items", action: "read" },
+  { module: "inventory_items", action: "update" },
+  { module: "inventory_items", action: "inbound" },
+  { module: "inventory_items", action: "outbound" },
+  { module: "inventory_items", action: "transfer" },
 ];
 
 export function permissionKey(module: string, action: string): string {

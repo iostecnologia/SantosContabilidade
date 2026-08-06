@@ -15,6 +15,8 @@ import { AccountsPayableModule } from "./accounts-payable/accounts-payable.modul
 import { AccountsReceivableModule } from "./accounts-receivable/accounts-receivable.module";
 import { FixedAssetsModule } from "./fixed-assets/fixed-assets.module";
 import { BudgetModule } from "./budget/budget.module";
+import { WarehousesModule } from "./warehouses/warehouses.module";
+import { InventoryItemsModule } from "./inventory-items/inventory-items.module";
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { BudgetModule } from "./budget/budget.module";
     AccountsReceivableModule,
     FixedAssetsModule,
     BudgetModule,
+    WarehousesModule,
+    InventoryItemsModule,
   ],
 })
 export class AppModule {}

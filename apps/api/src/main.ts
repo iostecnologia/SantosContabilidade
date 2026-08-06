@@ -21,6 +21,11 @@ async function bootstrap() {
     }),
   );
 
+  // Todas as rotas da API ficam sob /api — o mesmo domínio de produção serve
+  // o frontend estático fora desse prefixo (ver Caddyfile), sem precisar de
+  // CORS (mesma origem, só dividido por path).
+  app.setGlobalPrefix("api");
+
   const config = new DocumentBuilder()
     .setTitle("Santos Sistema Administrativo Financeiro")
     .setDescription("API da fundação multi-tenant (auth/RBAC, plano de contas, lançamentos contábeis)")

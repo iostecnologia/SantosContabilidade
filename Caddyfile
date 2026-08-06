@@ -1,3 +1,10 @@
 contabil.fabricanet.com.br {
-	reverse_proxy api:3000
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
 }

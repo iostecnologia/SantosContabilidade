@@ -1,6 +1,6 @@
 # Santos Sistema Administrativo Financeiro
 
-Plataforma SaaS multi-tenant de gestão administrativa e financeira. Este repositório contém, por enquanto, **apenas o backend** (`apps/api`): isolamento multi-tenant real via PostgreSQL Row-Level Security, autenticação/RBAC, Plano de Contas hierárquico, Lançamentos Contábeis por partidas dobradas (header + linhas), o módulo de **Lançamento de Documentos Fiscais** (Strategy Pattern, CBS/IBS/reforma tributária + retenções), o módulo **Financeiro** (contas bancárias/caixa, contas a pagar/receber) e o módulo **Ativo Fixo / Depreciação**. Os demais módulos (orçamento, almoxarifado, relatórios, frontend dark-mode) ficam para as próximas iterações.
+Plataforma SaaS multi-tenant de gestão administrativa e financeira. Backend (`apps/api`): isolamento multi-tenant real via PostgreSQL Row-Level Security, autenticação/RBAC, Plano de Contas hierárquico, Lançamentos Contábeis por partidas dobradas (header + linhas), o módulo de **Lançamento de Documentos Fiscais** (Strategy Pattern, CBS/IBS/reforma tributária + retenções), o módulo **Financeiro** (contas bancárias/caixa, contas a pagar/receber) e o módulo **Ativo Fixo / Depreciação**. Frontend (`apps/web`): React + Vite dark-mode, cobrindo por enquanto o fluxo contábil core (Plano de Contas, Centros de Custo, Lançamentos) — os demais módulos ganham tela nas próximas iterações. Ainda faltam: orçamento, almoxarifado, relatórios.
 
 ## Por que RLS, e por que header+lines nos lançamentos
 
@@ -9,8 +9,10 @@ Isolamento entre empresas é garantido pelo **Postgres**, não só por `WHERE or
 ## Stack
 
 - **Backend**: NestJS 10 + TypeScript, Prisma ORM
+- **Frontend**: React 18 + Vite + TypeScript, Tailwind (tema escuro fixo), TanStack Query, React Hook Form + Zod
 - **Banco**: PostgreSQL 15 (Row-Level Security + triggers para integridade contábil)
 - **Auth**: JWT (access curto + refresh rotacionado com detecção de reuso)
+- **Produção**: um único domínio — Caddy serve o frontend estático e faz proxy de `/api/*` pra API (mesma origem, sem CORS)
 
 ## Pré-requisitos
 
@@ -31,10 +33,11 @@ docker-compose up -d postgres
 cp apps/api/.env.example apps/api/.env
 npm install
 
-npm run prisma:migrate    # aplica as duas migrações (tabelas + RLS/triggers/grants)
+npm run prisma:migrate    # aplica as migrações (tabelas + RLS/triggers/grants)
 npm run prisma:seed       # popula o catálogo global de permissões
 
 npm run api:dev           # http://localhost:3000, Swagger em /api/docs
+npm run -w apps/web dev   # http://localhost:5173, proxy de /api pro backend acima
 ```
 
 ## Deploy em VPS com Docker (stack completa)
@@ -53,15 +56,16 @@ docker-compose run --rm api npm run prisma:seed -w apps/api
 
 docker-compose up -d api
 
-# HTTPS via Caddy (Let's Encrypt automático) — ajuste o domínio no Caddyfile antes
-docker-compose up -d caddy
+# HTTPS via Caddy (Let's Encrypt automático) — ajuste o domínio no Caddyfile
+# antes. O serviço `web` É o Caddy: builda o frontend e serve estático +
+# proxy reverso de /api/* pro serviço `api`, tudo num container só.
+docker-compose build web
+docker-compose up -d web
 ```
 
-A API não publica a porta 3000 diretamente no host; todo acesso externo passa pelo Caddy (`Caddyfile`, domínio configurado ali), que emite e renova o certificado TLS sozinho. Precisa de DNS (registro A) apontando pro IP da VPS antes de subir o Caddy, senão a emissão do certificado falha.
+Nem a API nem o frontend publicam porta diretamente no host — todo acesso externo passa pelo `web` (Caddy, `Caddyfile`, domínio configurado ali), que emite e renova o certificado TLS sozinho. Precisa de DNS (registro A) apontando pro IP da VPS antes de subir o `web`, senão a emissão do certificado falha.
 
 As senhas do Postgres (`POSTGRES_SUPERUSER_PASSWORD`, `APP_MIGRATOR_PASSWORD`, `APP_USER_PASSWORD`) vêm só do `.env` (gitignored) — nunca hardcode em `docker/postgres-init/01-roles.sh` nem em `docker-compose.yml`, já que este repositório é público.
-
-O `Dockerfile` (`apps/api/Dockerfile`) e o serviço `api` do `docker-compose.yml` não foram testados com um build real neste ambiente (sem Docker disponível aqui) — foram escritos com cuidado seguindo o padrão de monorepo com npm workspaces, mas vale conferir o primeiro `docker-compose build api` no seu VPS.
 
 ## Testes
 
@@ -78,7 +82,7 @@ Os testes **e2e** conectam diretamente via `pg` (não pela API), como os papéis
 
 ```bash
 # 1. Registrar organização + usuário admin (rota pública, já retorna tokens)
-curl -X POST http://localhost:3000/auth/register-organization \
+curl -X POST http://localhost:3000/api/auth/register-organization \
   -H "Content-Type: application/json" \
   -d '{
     "organizationName": "Acme Contabilidade",
@@ -90,23 +94,23 @@ curl -X POST http://localhost:3000/auth/register-organization \
 # guarde o accessToken da resposta em $TOKEN
 
 # 2. Centro de custo
-curl -X POST http://localhost:3000/cost-centers \
+curl -X POST http://localhost:3000/api/cost-centers \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"code": "01", "name": "Administrativo"}'
 
 # 3. Contas contábeis (sintética + analítica)
-curl -X POST http://localhost:3000/accounts \
+curl -X POST http://localhost:3000/api/accounts \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"code": "1.1", "name": "Ativo Circulante", "type": "ASSET"}'
 # guarde o id retornado como $PARENT_ID
 
-curl -X POST http://localhost:3000/accounts \
+curl -X POST http://localhost:3000/api/accounts \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"code\": \"1.1.01\", \"name\": \"Caixa\", \"type\": \"ASSET\", \"parentId\": \"$PARENT_ID\"}"
 # a conta pai vira sintética automaticamente (trigger) assim que ganha esta filha
 
 # 4. Lançamento contábil balanceado (débito = crédito)
-curl -X POST http://localhost:3000/journal-entries \
+curl -X POST http://localhost:3000/api/journal-entries \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{
     "entryDate": "2026-08-06",
@@ -121,10 +125,10 @@ curl -X POST http://localhost:3000/journal-entries \
 # 5. Tentar postar na conta pai (sintética) → 400 (bloqueado pelo trigger de postabilidade)
 # 6. Tentar um lançamento desbalanceado → 400 antes mesmo de chegar ao banco
 # 7. Estornar um lançamento (nunca editar/apagar)
-curl -X POST http://localhost:3000/journal-entries/<id>/reverse -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:3000/api/journal-entries/<id>/reverse -H "Authorization: Bearer $TOKEN"
 
 # 8. Módulo fiscal: gerar só o rascunho (não persiste) de uma NFS-e de serviço tomado com retenções
-curl -X POST http://localhost:3000/fiscal/lancamentos/preview \
+curl -X POST http://localhost:3000/api/fiscal/lancamentos/preview \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{
     "documento": {
@@ -169,6 +173,14 @@ apps/api/
   src/fixed-assets/                    # ativo fixo: registro (sem lançamento), depreciação periódica e baixa
   test/unit/contabilizacao-fiscal.spec.ts
   test/e2e/tenant-isolation.e2e-spec.ts
+apps/web/
+  src/lib/                              # api-client.ts (fetch + refresh automático), jwt.ts (decode client-side)
+  src/contexts/auth-context.tsx         # AuthProvider: tokens, permissions do JWT, login/logout
+  src/components/layout/AppShell.tsx    # sidebar dark-mode fixa + navegação
+  src/components/ui/                    # Button, Input/Select, Modal, Card
+  src/pages/                            # LoginPage, DashboardPage, cost-centers/, accounts/, journal-entries/
+  Dockerfile                            # build Vite -> imagem caddy:2-alpine com o dist/ embutido
+Caddyfile                               # split de rotas: /api/* -> api:3000, resto -> estático do apps/web
 docker-compose.yml
 ```
 
@@ -186,6 +198,12 @@ Duas estratégias de referência estão implementadas (`ContabilizacaoNfseServic
 
 `POST /fixed-assets` só cadastra o ativo (custo, vida útil, contas contábeis) — **não posta lançamento**, já que a capitalização pode ter vindo de vários caminhos (compra à vista, um título de AP, etc.), fora de escopo modelar aqui. `POST /fixed-assets/depreciation-runs` roda a depreciação linear de um período pra todos os ativos ativos (idempotente por período), postando um lançamento por ativo. `POST /fixed-assets/:id/dispose` faz a baixa (write-off puro, sem venda): estorna a depreciação acumulada e lança a perda pelo valor contábil restante.
 
+### Frontend — como funciona
+
+SPA em React + Vite, sem SSR, build estático servido pelo próprio Caddy. Autenticação via JWT guardado em `localStorage`; o `api-client.ts` injeta o `Authorization: Bearer` em toda chamada e, num 401, renova a sessão sozinho — com uma promise de refresh compartilhada entre chamadas concorrentes, porque o refresh token do backend é rotacionado e de uso único (duas renovações simultâneas com o mesmo token derrubariam a sessão à toa). Permissões do usuário (`hasPermission("cost_centers:create")` etc.) vêm decodificadas do próprio JWT de acesso, mesmas chaves do catálogo do backend — botões de criar/editar/remover somem da UI se o usuário não tiver a permissão (o backend continua sendo a fonte de verdade, a UI só evita mostrar ação que sabe que vai ser rejeitada).
+
+Escopo atual: login, dashboard com cards resumo (calculados no cliente a partir das listas — sem endpoint de agregação, isso é trabalho do futuro módulo de relatórios), Plano de Contas (árvore hierárquica), Centros de Custo e Lançamentos Contábeis (linhas dinâmicas, valida saldo no cliente antes de enviar, estorno). Financeiro, Ativo Fixo, Fiscal e Roles/Users ainda não têm tela — endpoints já existem no backend, só falta a UI.
+
 ## Próximos módulos (não incluídos ainda)
 
-Orçamento, Almoxarifado, cadastro persistido de mapeamento contábil fiscal por organização (hoje vem explícito na requisição), mais estratégias fiscais (NF-e de compra, CT-e, ...), Relatórios (Balancete, Razão, DRE, Fluxo de Caixa, ...), e o frontend dark-mode com dashboards de fluxo de caixa.
+Orçamento, Almoxarifado, cadastro persistido de mapeamento contábil fiscal por organização (hoje vem explícito na requisição), mais estratégias fiscais (NF-e de compra, CT-e, ...), Relatórios (Balancete, Razão, DRE, Fluxo de Caixa, ...), e telas de frontend pros módulos Financeiro/Ativo Fixo/Fiscal/Roles-Users.

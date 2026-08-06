@@ -44,9 +44,11 @@ services:
     # hostname `api`) precisa alcançar a API. Acesso externo é sempre via
     # HTTPS pelo Caddy.
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: santos_saf_caddy
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: santos_saf_web
     restart: unless-stopped
     depends_on:
       - api
@@ -54,7 +56,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
 

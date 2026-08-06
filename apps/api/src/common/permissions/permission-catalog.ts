@@ -83,6 +83,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "inventory_items", action: "transfer" },
 
   { module: "reports", action: "read" },
+
+  { module: "bank_reconciliation", action: "read" },
+  { module: "bank_reconciliation", action: "import" },
+  { module: "bank_reconciliation", action: "match" },
+  { module: "bank_reconciliation", action: "close" },
 ];
 
 export function permissionKey(module: string, action: string): string {

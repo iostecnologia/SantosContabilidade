@@ -18,6 +18,7 @@ import { BudgetModule } from "./budget/budget.module";
 import { WarehousesModule } from "./warehouses/warehouses.module";
 import { InventoryItemsModule } from "./inventory-items/inventory-items.module";
 import { ReportsModule } from "./reports/reports.module";
+import { BankReconciliationModule } from "./bank-reconciliation/bank-reconciliation.module";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ReportsModule } from "./reports/reports.module";
     WarehousesModule,
     InventoryItemsModule,
     ReportsModule,
+    BankReconciliationModule,
   ],
 })
 export class AppModule {}

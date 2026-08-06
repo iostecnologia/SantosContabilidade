@@ -59,6 +59,18 @@ enum StockMovementType {
   OUTBOUND
 }
 
+enum BankReconciliationStatus {
+  OPEN
+  CLOSED
+}
+
+enum BankStatementLineStatus {
+  PENDING
+  MATCHED
+  ADJUSTED
+  IGNORED
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -91,6 +103,8 @@ model Organization {
   warehouseStocks               WarehouseStock[]
   stockMovements                StockMovement[]
   stockTransfers                StockTransfer[]
+  bankReconciliations           BankReconciliation[]
+  bankStatementLines            BankStatementLine[]
 
   @@map("organizations")
 }
@@ -310,9 +324,10 @@ model JournalEntryLine {
   amount         Decimal       @db.Decimal(18, 2)
   lineNumber     Int           @map("line_number")
 
-  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  journalEntry        JournalEntry       @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account             Account            @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter          CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  reconciliationMatch BankStatementLine?
 
   @@index([organizationId])
   @@index([journalEntryId])
@@ -354,10 +369,12 @@ model BankAccount {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  glAccount    Account                     @relation(fields: [glAccountId], references: [id], onDelete: Restrict)
-  payments     AccountsPayablePayment[]
-  receipts     AccountsReceivableReceipt[]
+  organization    Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  glAccount       Account                     @relation(fields: [glAccountId], references: [id], onDelete: Restrict)
+  payments        AccountsPayablePayment[]
+  receipts        AccountsReceivableReceipt[]
+  reconciliations BankReconciliation[]
+  statementLines  BankStatementLine[]
 
   @@index([organizationId])
   @@map("bank_accounts")
@@ -696,4 +713,59 @@ model StockTransfer {
 
   @@index([organizationId, itemId])
   @@map("stock_transfers")
+}
+
+// Uma "sessão" de conciliação = um extrato (OFX) importado para uma conta
+// bancária num período. Diferente de JournalEntry/StockMovement, NÃO é
+// imutável: linhas mudam de status (PENDING -> MATCHED/ADJUSTED/IGNORED) e a
+// sessão mesma vai de OPEN -> CLOSED — mesmo raciocínio de BudgetPlan (regra
+// de transição de estado é responsabilidade do serviço, não de REVOKE no
+// banco). Fechar exige diferença zero entre statement_closing_balance e o
+// saldo do razão na glAccount do BankAccount na data de periodEnd (ver
+// BankReconciliationService.close).
+model BankReconciliation {
+  id                      String                   @id @default(uuid())
+  organizationId          String                   @map("organization_id")
+  bankAccountId           String                   @map("bank_account_id")
+  periodStart             DateTime                 @map("period_start") @db.Date
+  periodEnd               DateTime                 @map("period_end") @db.Date
+  statementClosingBalance Decimal                  @map("statement_closing_balance") @db.Decimal(18, 2)
+  status                  BankReconciliationStatus @default(OPEN)
+  createdBy               String                   @map("created_by")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  closedAt                DateTime?                @map("closed_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount  BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  lines        BankStatementLine[]
+
+  @@index([organizationId, bankAccountId])
+  @@map("bank_reconciliations")
+}
+
+// amount é assinado: positivo = crédito no extrato (dinheiro entrando, casa
+// com DEBIT na glAccount do banco, que é conta de ativo), negativo = débito
+// no extrato (casa com CREDIT). fitId é o identificador único do banco no
+// OFX — usado para não reimportar a mesma transação duas vezes.
+model BankStatementLine {
+  id                        String                  @id @default(uuid())
+  organizationId            String                  @map("organization_id")
+  bankReconciliationId      String                  @map("bank_reconciliation_id")
+  bankAccountId             String                  @map("bank_account_id")
+  transactionDate           DateTime                @map("transaction_date") @db.Date
+  amount                    Decimal                 @db.Decimal(18, 2)
+  description               String
+  fitId                     String?                 @map("fit_id")
+  status                    BankStatementLineStatus @default(PENDING)
+  matchedJournalEntryLineId String?                 @unique @map("matched_journal_entry_line_id")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+
+  organization            Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankReconciliation      BankReconciliation @relation(fields: [bankReconciliationId], references: [id], onDelete: Cascade)
+  bankAccount             BankAccount        @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  matchedJournalEntryLine JournalEntryLine?  @relation(fields: [matchedJournalEntryLineId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, bankReconciliationId])
+  @@index([organizationId, bankAccountId, fitId])
+  @@map("bank_statement_lines")
 }

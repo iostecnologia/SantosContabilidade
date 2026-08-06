@@ -57,7 +57,9 @@ function forceLogout(): void {
 export async function apiFetch<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const tokens = getTokens();
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body) {
+  // FormData fica de fora: o browser precisa gerar o Content-Type sozinho
+  // (com o boundary do multipart), sobrescrever aqui quebraria o parse no backend.
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   if (tokens) {
@@ -104,3 +106,7 @@ export const apiPost = <T>(path: string, body?: unknown) =>
 export const apiPatch = <T>(path: string, body?: unknown) =>
   apiFetch<T>(path, { method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined });
 export const apiDelete = <T>(path: string) => apiFetch<T>(path, { method: "DELETE" });
+
+// Sem Content-Type manual de propósito: o browser define o boundary do
+// multipart sozinho a partir do FormData — sobrescrever quebraria o parse no backend.
+export const apiPostForm = <T>(path: string, form: FormData) => apiFetch<T>(path, { method: "POST", body: form });

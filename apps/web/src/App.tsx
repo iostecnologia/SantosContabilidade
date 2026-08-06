@@ -8,6 +8,7 @@ import { CostCentersPage } from "./pages/cost-centers/CostCentersPage";
 import { AccountsPage } from "./pages/accounts/AccountsPage";
 import { JournalEntriesPage } from "./pages/journal-entries/JournalEntriesPage";
 import { FinanceiroPage } from "./pages/financeiro/FinanceiroPage";
+import { BankReconciliationPage } from "./pages/bank-reconciliation/BankReconciliationPage";
 import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
@@ -62,6 +63,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <FinanceiroPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bank-reconciliation"
+        element={
+          <ProtectedRoute>
+            <BankReconciliationPage />
           </ProtectedRoute>
         }
       />

@@ -30,6 +30,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
+  // Sem rota nenhuma mapeada em "/" — quem abre o domínio pelado cai num 404
+  // sem contexto. Redireciona pra documentação.
+  app.getHttpAdapter().get("/", (_req, res) => res.redirect("/api/docs"));
+
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port);
 }

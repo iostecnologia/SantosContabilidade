@@ -66,7 +66,17 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, isRet
 
   const res = await fetch(`/api${path}`, { ...options, headers });
 
-  if (res.status === 401 && tokens && !isRetry) {
+  // Um 401 só significa "sessão expirada" quando a requisição já ia com um
+  // access token (ex.: expirou no meio do uso). Num 401 sem token — como a
+  // própria tentativa de login com senha errada — é só um erro normal, com
+  // mensagem real do backend; forçar logout aqui não faz sentido (não há
+  // sessão nenhuma pra derrubar) e esconderia "Credenciais inválidas." atrás
+  // de um "sessão expirada" enganoso.
+  if (res.status === 401 && tokens) {
+    if (isRetry) {
+      forceLogout();
+      throw new ApiError(401, "Sessão expirada. Faça login novamente.");
+    }
     try {
       await refreshTokens(tokens.refreshToken);
     } catch {
@@ -74,11 +84,6 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, isRet
       throw new ApiError(401, "Sessão expirada. Faça login novamente.");
     }
     return apiFetch<T>(path, options, true);
-  }
-
-  if (res.status === 401) {
-    forceLogout();
-    throw new ApiError(401, "Sessão expirada. Faça login novamente.");
   }
 
   if (res.status === 204) {

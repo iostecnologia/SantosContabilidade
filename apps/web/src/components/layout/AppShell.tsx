@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Landmark, FolderTree, BookOpenText, LogOut } from "lucide-react";
+import { LayoutDashboard, Landmark, FolderTree, BookOpenText, Wallet, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/auth-context";
 
 const navItems = [
@@ -8,6 +8,7 @@ const navItems = [
   { to: "/accounts", label: "Plano de Contas", icon: Landmark },
   { to: "/cost-centers", label: "Centros de Custo", icon: FolderTree },
   { to: "/journal-entries", label: "Lançamentos", icon: BookOpenText },
+  { to: "/financeiro", label: "Financeiro", icon: Wallet },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

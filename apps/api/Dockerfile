@@ -30,6 +30,10 @@ WORKDIR /repo
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY --from=build /repo/apps/api/prisma ./apps/api/prisma
+# prisma/seed.ts roda via ts-node direto do código-fonte (não do dist
+# compilado) e importa de ../src/common/permissions/permission-catalog.
+COPY --from=build /repo/apps/api/src ./apps/api/src
+COPY --from=build /repo/apps/api/tsconfig.json ./apps/api/tsconfig.json
 COPY --from=build /repo/apps/api/package.json ./apps/api/package.json
 COPY --from=build /repo/package.json ./package.json
 WORKDIR /repo/apps/api

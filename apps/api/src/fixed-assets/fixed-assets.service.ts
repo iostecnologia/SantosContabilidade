@@ -70,7 +70,7 @@ export class FixedAssetsService {
         organizationId,
         assetNumber,
         description: dto.description,
-        acquisitionDate: dto.acquisitionDate,
+        acquisitionDate: new Date(dto.acquisitionDate),
         acquisitionCost: dto.acquisitionCost,
         residualValue: dto.residualValue ?? 0,
         usefulLifeMonths: dto.usefulLifeMonths,
@@ -252,7 +252,7 @@ export class FixedAssetsService {
       where: { id },
       data: {
         status: "DISPOSED",
-        disposalDate: dto.disposalDate,
+        disposalDate: new Date(dto.disposalDate),
         disposalJournalEntryId: journalEntry.id,
         lossOnDisposalAccountId: dto.lossOnDisposalAccountId,
       },

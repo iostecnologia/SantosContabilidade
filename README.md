@@ -52,7 +52,12 @@ docker-compose run --rm api npm run prisma:migrate -w apps/api
 docker-compose run --rm api npm run prisma:seed -w apps/api
 
 docker-compose up -d api
+
+# HTTPS via Caddy (Let's Encrypt automático) — ajuste o domínio no Caddyfile antes
+docker-compose up -d caddy
 ```
+
+A API não publica a porta 3000 diretamente no host; todo acesso externo passa pelo Caddy (`Caddyfile`, domínio configurado ali), que emite e renova o certificado TLS sozinho. Precisa de DNS (registro A) apontando pro IP da VPS antes de subir o Caddy, senão a emissão do certificado falha.
 
 As senhas do Postgres (`POSTGRES_SUPERUSER_PASSWORD`, `APP_MIGRATOR_PASSWORD`, `APP_USER_PASSWORD`) vêm só do `.env` (gitignored) — nunca hardcode em `docker/postgres-init/01-roles.sh` nem em `docker-compose.yml`, já que este repositório é público.
 

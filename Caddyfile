@@ -1,0 +1,3 @@
+contabil.fabricanet.com.br {
+	reverse_proxy api:3000
+}

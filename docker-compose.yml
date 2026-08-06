@@ -40,8 +40,25 @@ services:
       JWT_ACCESS_TTL: "15m"
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET no .env da raiz do projeto}
       JWT_REFRESH_TTL_DAYS: "7"
+    # Sem publicação de porta pro host: só o Caddy (rede interna do Docker,
+    # hostname `api`) precisa alcançar a API. Acesso externo é sempre via
+    # HTTPS pelo Caddy.
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: santos_saf_caddy
+    restart: unless-stopped
+    depends_on:
+      - api
     ports:
-      - "3000:3000"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   santos_saf_pgdata:
+  caddy_data:
+  caddy_config:

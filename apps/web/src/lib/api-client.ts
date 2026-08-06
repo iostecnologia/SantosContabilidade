@@ -105,6 +105,8 @@ export const apiPost = <T>(path: string, body?: unknown) =>
   apiFetch<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined });
 export const apiPatch = <T>(path: string, body?: unknown) =>
   apiFetch<T>(path, { method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined });
+export const apiPut = <T>(path: string, body?: unknown) =>
+  apiFetch<T>(path, { method: "PUT", body: body !== undefined ? JSON.stringify(body) : undefined });
 export const apiDelete = <T>(path: string) => apiFetch<T>(path, { method: "DELETE" });
 
 // Sem Content-Type manual de propósito: o browser define o boundary do

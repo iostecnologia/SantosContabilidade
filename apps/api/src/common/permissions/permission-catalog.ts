@@ -81,6 +81,8 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "inventory_items", action: "inbound" },
   { module: "inventory_items", action: "outbound" },
   { module: "inventory_items", action: "transfer" },
+
+  { module: "reports", action: "read" },
 ];
 
 export function permissionKey(module: string, action: string): string {

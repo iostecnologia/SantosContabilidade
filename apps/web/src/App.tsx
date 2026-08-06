@@ -10,6 +10,7 @@ import { JournalEntriesPage } from "./pages/journal-entries/JournalEntriesPage";
 import { FinanceiroPage } from "./pages/financeiro/FinanceiroPage";
 import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
+import { ReportsPage } from "./pages/reports/ReportsPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -77,6 +78,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <WarehousePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <ReportsPage />
           </ProtectedRoute>
         }
       />

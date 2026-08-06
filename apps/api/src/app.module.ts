@@ -17,6 +17,7 @@ import { FixedAssetsModule } from "./fixed-assets/fixed-assets.module";
 import { BudgetModule } from "./budget/budget.module";
 import { WarehousesModule } from "./warehouses/warehouses.module";
 import { InventoryItemsModule } from "./inventory-items/inventory-items.module";
+import { ReportsModule } from "./reports/reports.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { InventoryItemsModule } from "./inventory-items/inventory-items.module";
     BudgetModule,
     WarehousesModule,
     InventoryItemsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

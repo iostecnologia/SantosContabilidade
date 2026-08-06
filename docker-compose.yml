@@ -10,7 +10,10 @@ services:
       APP_MIGRATOR_PASSWORD: ${APP_MIGRATOR_PASSWORD:?defina APP_MIGRATOR_PASSWORD no .env da raiz do projeto}
       APP_USER_PASSWORD: ${APP_USER_PASSWORD:?defina APP_USER_PASSWORD no .env da raiz do projeto}
     ports:
-      - "5432:5432"
+      # Só localhost: o serviço `api` alcança o Postgres pela rede interna do
+      # Docker (hostname `postgres`), não precisa de exposição externa. Isso
+      # ainda permite `psql` a partir da própria VPS quando necessário.
+      - "127.0.0.1:5432:5432"
     volumes:
       - santos_saf_pgdata:/var/lib/postgresql/data
       - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro

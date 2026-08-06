@@ -338,7 +338,7 @@ export function BankReconciliationDetail({
             error={formError}
             isSubmitting={adjustMutation.isPending}
             onClose={() => setAdjustingLine(null)}
-            onSubmit={(values) => adjustMutation.mutate(values)}
+            onSubmit={(values) => adjustMutation.mutate({ ...values, costCenterId: values.costCenterId || undefined })}
           />
         </Modal>
       )}

@@ -1,9 +1,21 @@
 <!doctype html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Santos SAF</title>
+    <script>
+      // Bloqueante de propósito: roda antes do primeiro paint pra evitar
+      // flash do tema errado. Espelha a leitura feita por ThemeProvider.
+      (function () {
+        try {
+          var stored = localStorage.getItem("santos-saf-theme");
+          document.documentElement.dataset.theme = stored === "light" ? "light" : "dark";
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100">
     <div id="root"></div>

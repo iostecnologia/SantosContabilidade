@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Landmark, FolderTree, BookOpenText, Wallet, PiggyBank, Boxes, Building2, FileBarChart, FileCheck2, Users, UserCog, Receipt, FileStack, LogOut } from "lucide-react";
+import { LayoutDashboard, Landmark, FolderTree, BookOpenText, Wallet, PiggyBank, Boxes, Building2, FileBarChart, FileCheck2, Users, UserCog, Receipt, FileStack, LogOut, Sun, Moon } from "lucide-react";
 import { useAuth } from "../../contexts/auth-context";
+import { useTheme } from "../../contexts/theme-context";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +23,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { organization, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
@@ -46,6 +48,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
+        <button
+          onClick={toggleTheme}
+          className="mx-2 mb-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+        >
+          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          Tema {theme === "dark" ? "claro" : "escuro"}
+        </button>
         <button
           onClick={() => void logout()}
           className="mx-2 mb-4 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-100"

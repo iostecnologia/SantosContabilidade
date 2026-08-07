@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Valores em "R G B" (sem vírgula) — formato exigido pelo padrão
+ * rgb(var(--x) / <alpha-value>) do Tailwind pra opacidade funcionar
+ * (bg-slate-800/40 etc.) — ver tailwind.config.ts.
+ *
+ * :root = tema escuro (valores reais do Tailwind slate/emerald/red/amber/sky,
+ * a aparência original do produto, mantida como fallback caso o script de
+ * index.html não rode). [data-theme="light"] sobrescreve com o MESMO papel
+ * em cada token — ex.: slate-100 sempre foi "texto mais proeminente"; no
+ * escuro isso é quase branco (sobre fundo escuro), no claro vira quase preto
+ * (sobre fundo claro) — só o hex muda, a relação de contraste se preserva.
+ */
+:root {
+  --c-slate-50: 248 250 252;
+  --c-slate-100: 241 245 249;
+  --c-slate-200: 226 232 240;
+  --c-slate-300: 203 213 225;
+  --c-slate-400: 148 163 184;
+  --c-slate-500: 100 116 139;
+  --c-slate-600: 71 85 105;
+  --c-slate-700: 51 65 85;
+  --c-slate-800: 30 41 59;
+  --c-slate-900: 15 23 42;
+  --c-slate-950: 2 6 23;
+
+  --c-emerald-300: 110 231 183;
+  --c-emerald-400: 52 211 153;
+  --c-emerald-800: 6 95 70;
+
+  --c-red-400: 248 113 113;
+  --c-red-800: 153 27 27;
+
+  --c-amber-400: 251 191 36;
+
+  --c-sky-400: 56 189 248;
+}
+
+:root[data-theme="light"] {
+  --c-slate-50: 2 6 23;
+  --c-slate-100: 15 23 42;
+  --c-slate-200: 30 41 59;
+  --c-slate-300: 51 65 85;
+  --c-slate-400: 71 85 105;
+  --c-slate-500: 100 116 139;
+  --c-slate-600: 148 163 184;
+  --c-slate-700: 203 213 225;
+  --c-slate-800: 226 232 240;
+  --c-slate-900: 241 245 249;
+  --c-slate-950: 248 250 252;
+
+  /* Texto/borda em cor de destaque precisa de mais contraste sobre fundo
+     claro do que sobre o escuro original — por isso não é uma inversão
+     mecânica igual ao slate, cada valor foi escolhido pelo contraste. */
+  --c-emerald-300: 6 95 70;
+  --c-emerald-400: 4 120 87;
+  --c-emerald-800: 110 231 183;
+
+  --c-red-400: 220 38 38;
+  --c-red-800: 252 165 165;
+
+  --c-amber-400: 180 83 9;
+
+  --c-sky-400: 3 105 161;
+}

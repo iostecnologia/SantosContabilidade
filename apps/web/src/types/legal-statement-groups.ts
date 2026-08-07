@@ -18,7 +18,9 @@ export const LEGAL_STATEMENT_GROUPS_BY_TYPE: Record<AccountType, { key: string; 
   EQUITY: [
     { key: "PL_CAPITAL_SOCIAL", label: "Patrimônio Líquido — Capital Social" },
     { key: "PL_RESERVAS_CAPITAL", label: "Patrimônio Líquido — Reservas de Capital" },
+    { key: "PL_AJUSTES_AVALIACAO_PATRIMONIAL", label: "Patrimônio Líquido — Ajustes de Avaliação Patrimonial" },
     { key: "PL_RESERVAS_LUCROS", label: "Patrimônio Líquido — Reservas de Lucros" },
+    { key: "PL_ACOES_TESOURARIA", label: "Patrimônio Líquido — Ações em Tesouraria" },
     { key: "PL_LUCROS_ACUMULADOS", label: "Patrimônio Líquido — Lucros/Prejuízos Acumulados" },
   ],
   REVENUE: [
@@ -34,5 +36,6 @@ export const LEGAL_STATEMENT_GROUPS_BY_TYPE: Record<AccountType, { key: string; 
     { key: "DESPESAS_FINANCEIRAS", label: "Despesas Financeiras" },
     { key: "OUTRAS_DESPESAS_OPERACIONAIS", label: "Outras Despesas Operacionais" },
     { key: "IRPJ_CSLL", label: "IRPJ e CSLL" },
+    { key: "PARTICIPACOES", label: "Participações (debêntures/empregados/administradores)" },
   ],
 };

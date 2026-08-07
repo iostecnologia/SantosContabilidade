@@ -120,6 +120,8 @@ export interface IncomeStatementLegalReport {
   despesasFinanceiras: LegalGroupResult;
   resultadoAntesTributos: number;
   irpjCsll: LegalGroupResult;
+  resultadoAposTributos: number;
+  participacoes: LegalGroupResult;
   lucroLiquido: number;
 }
 
@@ -140,7 +142,9 @@ export interface BalanceSheetLegalReport {
   patrimonioLiquido: {
     capitalSocial: LegalGroupResult;
     reservasCapital: LegalGroupResult;
+    ajustesAvaliacaoPatrimonial: LegalGroupResult;
     reservasLucros: LegalGroupResult;
+    acoesTesouraria: LegalGroupResult;
     lucrosAcumulados: LegalGroupResult;
     resultadoDoExercicio: number;
     total: number;

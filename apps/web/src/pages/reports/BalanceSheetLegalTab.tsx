@@ -79,7 +79,9 @@ export function BalanceSheetLegalTab() {
                 <GroupRow group={report.passivoNaoCirculante} />
                 <GroupRow group={report.patrimonioLiquido.capitalSocial} />
                 <GroupRow group={report.patrimonioLiquido.reservasCapital} />
+                <GroupRow group={report.patrimonioLiquido.ajustesAvaliacaoPatrimonial} />
                 <GroupRow group={report.patrimonioLiquido.reservasLucros} />
+                <GroupRow group={report.patrimonioLiquido.acoesTesouraria} />
                 <GroupRow group={report.patrimonioLiquido.lucrosAcumulados} />
                 <tr>
                   <td className="px-4 py-2 text-slate-400">Resultado do período (não apurado)</td>

@@ -69,6 +69,8 @@ export function IncomeStatementLegalTab() {
               <GroupRow group={report.despesasFinanceiras} />
               <SubtotalRow label="Resultado Antes dos Tributos" value={report.resultadoAntesTributos} />
               <GroupRow group={report.irpjCsll} />
+              <SubtotalRow label="Resultado Após Tributos" value={report.resultadoAposTributos} />
+              <GroupRow group={report.participacoes} />
               <SubtotalRow label="Lucro Líquido do Exercício" value={report.lucroLiquido} emphasize />
             </tbody>
           </table>

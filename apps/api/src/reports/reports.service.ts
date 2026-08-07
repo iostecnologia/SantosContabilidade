@@ -336,7 +336,11 @@ export class ReportsService {
     const despesasFinanceiras = groupResult("DESPESAS_FINANCEIRAS");
     const resultadoAntesTributos = resultadoOperacional + receitasFinanceiras.total - despesasFinanceiras.total;
     const irpjCsll = groupResult("IRPJ_CSLL");
-    const lucroLiquido = resultadoAntesTributos - irpjCsll.total;
+    const resultadoAposTributos = resultadoAntesTributos - irpjCsll.total;
+    // Art. 187, VI — participações (na prática de empresas pequenas, quase
+    // sempre PLR) são deduzidas DEPOIS do IRPJ/CSLL, não antes.
+    const participacoes = groupResult("PARTICIPACOES");
+    const lucroLiquido = resultadoAposTributos - participacoes.total;
 
     return {
       startDate: dto.startDate,
@@ -356,6 +360,8 @@ export class ReportsService {
       despesasFinanceiras,
       resultadoAntesTributos,
       irpjCsll,
+      resultadoAposTributos,
+      participacoes,
       lucroLiquido,
     };
   }
@@ -434,10 +440,19 @@ export class ReportsService {
     const passivoNaoCirculante = groupResult("PASSIVO_NAO_CIRCULANTE");
     const plCapitalSocial = groupResult("PL_CAPITAL_SOCIAL");
     const plReservasCapital = groupResult("PL_RESERVAS_CAPITAL");
+    const plAjustesAvaliacaoPatrimonial = groupResult("PL_AJUSTES_AVALIACAO_PATRIMONIAL");
     const plReservasLucros = groupResult("PL_RESERVAS_LUCROS");
+    // Contra-conta (reduz o PL) — ver comentário em legal-statement-groups.ts.
+    const plAcoesTesouraria = groupResult("PL_ACOES_TESOURARIA");
     const plLucrosAcumulados = groupResult("PL_LUCROS_ACUMULADOS");
     const totalPatrimonioLiquido =
-      plCapitalSocial.total + plReservasCapital.total + plReservasLucros.total + plLucrosAcumulados.total + netIncome;
+      plCapitalSocial.total +
+      plReservasCapital.total +
+      plAjustesAvaliacaoPatrimonial.total +
+      plReservasLucros.total +
+      plAcoesTesouraria.total +
+      plLucrosAcumulados.total +
+      netIncome;
     const totalPassivoMaisPatrimonioLiquido = passivoCirculante.total + passivoNaoCirculante.total + totalPatrimonioLiquido;
 
     return {
@@ -457,7 +472,9 @@ export class ReportsService {
       patrimonioLiquido: {
         capitalSocial: plCapitalSocial,
         reservasCapital: plReservasCapital,
+        ajustesAvaliacaoPatrimonial: plAjustesAvaliacaoPatrimonial,
         reservasLucros: plReservasLucros,
+        acoesTesouraria: plAcoesTesouraria,
         lucrosAcumulados: plLucrosAcumulados,
         resultadoDoExercicio: netIncome,
         total: totalPatrimonioLiquido,

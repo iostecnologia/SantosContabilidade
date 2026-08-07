@@ -30,7 +30,12 @@ export const LEGAL_STATEMENT_GROUPS_BY_TYPE: Record<AccountType, LegalStatementG
   EQUITY: [
     { key: "PL_CAPITAL_SOCIAL", label: "Patrimônio Líquido — Capital Social" },
     { key: "PL_RESERVAS_CAPITAL", label: "Patrimônio Líquido — Reservas de Capital" },
+    { key: "PL_AJUSTES_AVALIACAO_PATRIMONIAL", label: "Patrimônio Líquido — Ajustes de Avaliação Patrimonial" },
     { key: "PL_RESERVAS_LUCROS", label: "Patrimônio Líquido — Reservas de Lucros" },
+    // Contra-conta (reduz o PL) — normalmente com saldo devedor mesmo sendo
+    // EQUITY; a convenção de sinal já usada (amount = -netDebit) trata isso
+    // corretamente sem lógica especial, o saldo devedor vira valor negativo.
+    { key: "PL_ACOES_TESOURARIA", label: "Patrimônio Líquido — Ações em Tesouraria" },
     { key: "PL_LUCROS_ACUMULADOS", label: "Patrimônio Líquido — Lucros/Prejuízos Acumulados" },
   ],
   REVENUE: [
@@ -46,6 +51,11 @@ export const LEGAL_STATEMENT_GROUPS_BY_TYPE: Record<AccountType, LegalStatementG
     { key: "DESPESAS_FINANCEIRAS", label: "Despesas Financeiras" },
     { key: "OUTRAS_DESPESAS_OPERACIONAIS", label: "Outras Despesas Operacionais" },
     { key: "IRPJ_CSLL", label: "IRPJ e CSLL" },
+    // Art. 187, VI — participação de debêntures, empregados, administradores
+    // e partes beneficiárias no resultado. Na prática de empresas pequenas
+    // isso é quase sempre PLR (participação nos lucros dos empregados); a
+    // lei exige que seja deduzida DEPOIS do IRPJ/CSLL, não antes.
+    { key: "PARTICIPACOES", label: "Participações (debêntures/empregados/administradores)" },
   ],
 };
 

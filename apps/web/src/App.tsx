@@ -16,6 +16,7 @@ import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { SpedEsocialPage } from "./pages/sped-esocial/SpedEsocialPage";
+import { FixedAssetsPage } from "./pages/fixed-assets/FixedAssetsPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -131,6 +132,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <SpedEsocialPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fixed-assets"
+        element={
+          <ProtectedRoute>
+            <FixedAssetsPage />
           </ProtectedRoute>
         }
       />

@@ -113,6 +113,15 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "terminations", action: "create" },
   { module: "terminations", action: "read" },
   { module: "terminations", action: "post" },
+
+  { module: "company_registration", action: "read" },
+  { module: "company_registration", action: "update" },
+
+  { module: "esocial", action: "create" },
+  { module: "esocial", action: "read" },
+  { module: "esocial", action: "update" },
+
+  { module: "sped", action: "generate" },
 ];
 
 export function permissionKey(module: string, action: string): string {

@@ -16,6 +16,23 @@ export interface Employee {
   mealVoucherMonthlyValue: string | null;
   mealVoucherDiscountRate: string | null;
   status: EmployeeStatus;
+  // Campos abaixo alimentam só a geração de eventos eSocial — todos opcionais,
+  // preenchidos na criação ou depois via edição (ver schema.prisma model Employee).
+  pis: string | null;
+  birthDate: string | null;
+  sex: string | null;
+  ctpsNumber: string | null;
+  ctpsSeries: string | null;
+  cboCode: string | null;
+  esocialCategoryCode: number | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressCityIbgeCode: string | null;
+  addressState: string | null;
+  addressZipCode: string | null;
   createdAt: string;
   updatedAt: string;
   costCenter?: { id: string; code: string; name: string } | null;
@@ -32,6 +49,21 @@ export interface CreateEmployeeInput {
   transportVoucherMonthlyValue?: number;
   mealVoucherMonthlyValue?: number;
   mealVoucherDiscountRate?: number;
+  pis?: string;
+  birthDate?: string;
+  sex?: string;
+  ctpsNumber?: string;
+  ctpsSeries?: string;
+  cboCode?: string;
+  esocialCategoryCode?: number;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressComplement?: string;
+  addressNeighborhood?: string;
+  addressCity?: string;
+  addressCityIbgeCode?: string;
+  addressState?: string;
+  addressZipCode?: string;
 }
 
 export type UpdateEmployeeInput = Partial<CreateEmployeeInput>;

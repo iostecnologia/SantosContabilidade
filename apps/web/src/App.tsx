@@ -15,6 +15,7 @@ import { FiscalPage } from "./pages/fiscal/FiscalPage";
 import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
+import { SpedEsocialPage } from "./pages/sped-esocial/SpedEsocialPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -122,6 +123,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <FiscalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sped-esocial"
+        element={
+          <ProtectedRoute>
+            <SpedEsocialPage />
           </ProtectedRoute>
         }
       />

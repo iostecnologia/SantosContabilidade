@@ -31,7 +31,25 @@ const createSchema = z.object({
 });
 type CreateValues = z.infer<typeof createSchema>;
 
-const editSchema = createSchema.omit({ cpf: true, admissionDate: true });
+const esocialFields = {
+  pis: z.string().max(14).optional(),
+  birthDate: z.string().optional(),
+  sex: z.enum(["M", "F"]).optional(),
+  ctpsNumber: z.string().max(20).optional(),
+  ctpsSeries: z.string().max(10).optional(),
+  cboCode: z.string().max(10).optional(),
+  esocialCategoryCode: z.coerce.number().int().optional(),
+  addressStreet: z.string().max(160).optional(),
+  addressNumber: z.string().max(20).optional(),
+  addressComplement: z.string().max(80).optional(),
+  addressNeighborhood: z.string().max(80).optional(),
+  addressCity: z.string().max(80).optional(),
+  addressCityIbgeCode: z.string().max(7).optional(),
+  addressState: z.string().max(2).optional(),
+  addressZipCode: z.string().max(10).optional(),
+};
+
+const editSchema = createSchema.omit({ cpf: true, admissionDate: true }).extend(esocialFields);
 type EditValues = z.infer<typeof editSchema>;
 
 export function EmployeesTab() {
@@ -269,11 +287,35 @@ function EditForm({
       transportVoucherMonthlyValue: employee.transportVoucherMonthlyValue ? Number(employee.transportVoucherMonthlyValue) : undefined,
       mealVoucherMonthlyValue: employee.mealVoucherMonthlyValue ? Number(employee.mealVoucherMonthlyValue) : undefined,
       mealVoucherDiscountRate: employee.mealVoucherDiscountRate ? Number(employee.mealVoucherDiscountRate) : undefined,
+      pis: employee.pis ?? "",
+      birthDate: employee.birthDate ? employee.birthDate.slice(0, 10) : "",
+      sex: (employee.sex as "M" | "F" | undefined) ?? undefined,
+      ctpsNumber: employee.ctpsNumber ?? "",
+      ctpsSeries: employee.ctpsSeries ?? "",
+      cboCode: employee.cboCode ?? "",
+      esocialCategoryCode: employee.esocialCategoryCode ?? undefined,
+      addressStreet: employee.addressStreet ?? "",
+      addressNumber: employee.addressNumber ?? "",
+      addressComplement: employee.addressComplement ?? "",
+      addressNeighborhood: employee.addressNeighborhood ?? "",
+      addressCity: employee.addressCity ?? "",
+      addressCityIbgeCode: employee.addressCityIbgeCode ?? "",
+      addressState: employee.addressState ?? "",
+      addressZipCode: employee.addressZipCode ?? "",
     },
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1">
+    <form
+      onSubmit={handleSubmit((values) => {
+        const cleaned = { ...values };
+        for (const key of Object.keys(esocialFields) as (keyof typeof esocialFields)[]) {
+          if (cleaned[key] === "") delete cleaned[key];
+        }
+        onSubmit(cleaned);
+      })}
+      className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1"
+    >
       <Input label="Nome completo" {...register("fullName")} error={errors.fullName?.message} />
       <Input label="Cargo" {...register("position")} error={errors.position?.message} />
       <Select label="Centro de custo (opcional)" {...register("costCenterId")}>
@@ -311,6 +353,53 @@ function EditForm({
         {...register("mealVoucherDiscountRate")}
         error={errors.mealVoucherDiscountRate?.message}
       />
+
+      <details className="rounded-md border border-slate-800 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-slate-300">
+          Dados para eSocial (opcional — necessários para gerar admissão/remuneração)
+        </summary>
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="PIS" {...register("pis")} error={errors.pis?.message} />
+            <Input label="Data de nascimento" type="date" {...register("birthDate")} error={errors.birthDate?.message} />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Select label="Sexo" {...register("sex")}>
+              <option value="">—</option>
+              <option value="M">Masculino</option>
+              <option value="F">Feminino</option>
+            </Select>
+            <Input label="CTPS nº" {...register("ctpsNumber")} error={errors.ctpsNumber?.message} />
+            <Input label="CTPS série" {...register("ctpsSeries")} error={errors.ctpsSeries?.message} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Código CBO" {...register("cboCode")} error={errors.cboCode?.message} />
+            <Input
+              label="Categoria eSocial (código)"
+              type="number"
+              {...register("esocialCategoryCode")}
+              error={errors.esocialCategoryCode?.message}
+            />
+          </div>
+          <Input label="Logradouro" {...register("addressStreet")} error={errors.addressStreet?.message} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Número" {...register("addressNumber")} error={errors.addressNumber?.message} />
+            <Input label="Complemento" {...register("addressComplement")} error={errors.addressComplement?.message} />
+          </div>
+          <Input label="Bairro" {...register("addressNeighborhood")} error={errors.addressNeighborhood?.message} />
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="Cidade" {...register("addressCity")} error={errors.addressCity?.message} />
+            <Input
+              label="Código IBGE do município"
+              {...register("addressCityIbgeCode")}
+              error={errors.addressCityIbgeCode?.message}
+            />
+            <Input label="UF" maxLength={2} {...register("addressState")} error={errors.addressState?.message} />
+          </div>
+          <Input label="CEP" {...register("addressZipCode")} error={errors.addressZipCode?.message} />
+        </div>
+      </details>
+
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onClose}>

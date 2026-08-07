@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Landmark, FolderTree, BookOpenText, Wallet, PiggyBank, Boxes, FileBarChart, FileCheck2, Users, UserCog, Receipt, LogOut } from "lucide-react";
+import { LayoutDashboard, Landmark, FolderTree, BookOpenText, Wallet, PiggyBank, Boxes, FileBarChart, FileCheck2, Users, UserCog, Receipt, FileStack, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/auth-context";
 
 const navItems = [
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/budget", label: "Orçamento", icon: PiggyBank },
   { to: "/warehouse", label: "Almoxarifado", icon: Boxes },
   { to: "/departamento-pessoal", label: "Departamento Pessoal", icon: UserCog },
+  { to: "/sped-esocial", label: "SPED e eSocial", icon: FileStack },
   { to: "/reports", label: "Relatórios", icon: FileBarChart },
   { to: "/users", label: "Usuários", icon: Users },
 ];

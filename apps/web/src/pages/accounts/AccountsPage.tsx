@@ -27,6 +27,7 @@ const editSchema = z.object({
   name: z.string().min(1, "Obrigatório").max(160),
   isActive: z.boolean(),
   costCenterId: z.string().optional(),
+  spedReferenceCode: z.string().max(40).optional(),
 });
 type EditValues = z.infer<typeof editSchema>;
 
@@ -288,13 +289,20 @@ function EditModal({
     formState: { errors },
   } = useForm<EditValues>({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: account.name, isActive: account.isActive, costCenterId: account.costCenterId ?? "" },
+    defaultValues: {
+      name: account.name,
+      isActive: account.isActive,
+      costCenterId: account.costCenterId ?? "",
+      spedReferenceCode: account.spedReferenceCode ?? "",
+    },
   });
 
   return (
     <Modal title={`Editar "${account.code}"`} onClose={onClose}>
       <form
-        onSubmit={handleSubmit((values) => onSubmit({ ...values, costCenterId: values.costCenterId || undefined }))}
+        onSubmit={handleSubmit((values) =>
+          onSubmit({ ...values, costCenterId: values.costCenterId || undefined, spedReferenceCode: values.spedReferenceCode || undefined }),
+        )}
         className="flex flex-col gap-4"
       >
         <Input label="Nome" {...register("name")} error={errors.name?.message} />
@@ -306,6 +314,11 @@ function EditModal({
             </option>
           ))}
         </Select>
+        <Input
+          label="Código do plano de contas referencial (SPED)"
+          {...register("spedReferenceCode")}
+          error={errors.spedReferenceCode?.message}
+        />
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input type="checkbox" {...register("isActive")} className="h-4 w-4 rounded border-slate-700 bg-slate-900" />
           Ativa

@@ -58,7 +58,12 @@ export class AccountsService {
     }
     return this.tx.account.update({
       where: { id },
-      data: { name: dto.name, isActive: dto.isActive, costCenterId: dto.costCenterId },
+      data: {
+        name: dto.name,
+        isActive: dto.isActive,
+        costCenterId: dto.costCenterId,
+        spedReferenceCode: dto.spedReferenceCode,
+      },
     });
   }
 

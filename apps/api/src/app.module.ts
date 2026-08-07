@@ -20,6 +20,7 @@ import { InventoryItemsModule } from "./inventory-items/inventory-items.module";
 import { ReportsModule } from "./reports/reports.module";
 import { BankReconciliationModule } from "./bank-reconciliation/bank-reconciliation.module";
 import { DepartamentoPessoalModule } from "./departamento-pessoal/departamento-pessoal.module";
+import { SpedEsocialModule } from "./sped-esocial/sped-esocial.module";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { DepartamentoPessoalModule } from "./departamento-pessoal/departamento-p
     ReportsModule,
     BankReconciliationModule,
     DepartamentoPessoalModule,
+    SpedEsocialModule,
   ],
 })
 export class AppModule {}

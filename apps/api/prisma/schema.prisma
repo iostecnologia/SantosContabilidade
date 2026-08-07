@@ -123,6 +123,15 @@ enum PisCofinsRegime {
   NAO_CUMULATIVO
 }
 
+// GERADO: XML produzido pelo sistema, ainda não confirmado como enviado.
+// ENVIADO: contador marcou manualmente após transmitir via seu próprio
+// software com certificado digital (ver EsocialEvento.submissionProtocol) —
+// este sistema nunca transmite, só gera o XML (mesmo limite do módulo Fiscal).
+enum EsocialEventoStatus {
+  GERADO
+  ENVIADO
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -170,6 +179,8 @@ model Organization {
   simplesNacionalBrackets       SimplesNacionalBracket[]
   icmsUfRates                   IcmsUfRate[]
   fiscalDocumentosEmitidos      FiscalDocumentoEmitido[]
+  companyRegistration           CompanyRegistration?
+  esocialEventos                EsocialEvento[]
 
   @@map("organizations")
 }
@@ -310,6 +321,11 @@ model Account {
   isAnalytic     Boolean     @default(true) @map("is_analytic")
   isActive       Boolean     @default(true) @map("is_active")
   costCenterId   String?     @map("cost_center_id")
+  // Código do plano de contas referencial da RFB (ECD registro I051 / ECF
+  // Bloco J-K) — admin preenche por conta, mesmo padrão de "mapeamento
+  // configurado uma vez" do FiscalTaxSettings. Null = conta ainda não
+  // mapeada; ECD/ECF avisam quais contas faltam em vez de falhar silenciosamente.
+  spedReferenceCode String?  @map("sped_reference_code")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
@@ -892,6 +908,29 @@ model Employee {
   // descontam nada do empregado (fica null/0).
   mealVoucherDiscountRate      Decimal?       @map("meal_voucher_discount_rate") @db.Decimal(5, 4)
   status                       EmployeeStatus @default(ACTIVE)
+  // Campos abaixo só existem para permitir a geração de eventos eSocial
+  // (S-2200/S-2206/S-2230/S-2299) — todos opcionais porque funcionários
+  // cadastrados antes deste módulo não os têm; EsocialEventosService recusa
+  // gerar um evento específico enquanto os campos que ELE precisa estiverem
+  // vazios, em vez de exigir tudo de uma vez no cadastro básico.
+  pis                          String?        @map("pis")
+  birthDate                    DateTime?      @map("birth_date") @db.Date
+  sex                          String?        @map("sex") @db.Char(1)
+  ctpsNumber                   String?        @map("ctps_number")
+  ctpsSeries                   String?        @map("ctps_series")
+  // Código CBO (Classificação Brasileira de Ocupações) do cargo.
+  cboCode                      String?        @map("cbo_code")
+  // Código da tabela 1 do eSocial (ex.: 101 = empregado geral, CLT).
+  esocialCategoryCode          Int?           @map("esocial_category_code")
+  addressStreet                String?        @map("address_street")
+  addressNumber                String?        @map("address_number")
+  addressComplement            String?        @map("address_complement")
+  addressNeighborhood          String?        @map("address_neighborhood")
+  addressCity                  String?        @map("address_city")
+  // Código IBGE do município (7 dígitos) — exigido pelo eSocial, distinto do nome da cidade.
+  addressCityIbgeCode          String?        @map("address_city_ibge_code")
+  addressState                 String?        @map("address_state") @db.Char(2)
+  addressZipCode                String?        @map("address_zip_code")
   createdBy                    String         @map("created_by")
   createdAt                    DateTime       @default(now()) @map("created_at")
   updatedAt                    DateTime       @updatedAt @map("updated_at")
@@ -902,6 +941,7 @@ model Employee {
   vacations             Vacation[]
   thirteenthSalaryLines ThirteenthSalaryRunLine[]
   terminations          Termination[]
+  esocialEventos        EsocialEvento[]
 
   @@unique([organizationId, registrationNumber])
   @@unique([organizationId, cpf])
@@ -1270,4 +1310,80 @@ model FiscalDocumentoEmitido {
   @@unique([organizationId, numeroDocumento])
   @@index([organizationId, dataEmissao])
   @@map("fiscal_documentos_emitidos")
+}
+
+// Singleton por organização (get-or-create, mesmo padrão de PayrollSettings/
+// FiscalTaxSettings) — dados cadastrais do empregador exigidos pelos
+// registros de abertura do SPED (Bloco 0 / registro 0000/0100) e pelos
+// eventos não-periódicos do eSocial (S-1000/S-1005). Tudo opcional: a tela
+// existe para o contador preencher antes da primeira geração de arquivo,
+// mesmo raciocínio de "recusa calcular enquanto não configurado" do
+// PayrollSettings/FiscalTaxSettings.
+model CompanyRegistration {
+  id                     String   @id @default(uuid())
+  organizationId         String   @unique @map("organization_id")
+  legalNatureCode        String?  @map("legal_nature_code")
+  cnaeCode               String?  @map("cnae_code")
+  stateRegistration      String?  @map("state_registration")
+  municipalRegistration  String?  @map("municipal_registration")
+  // Código da tabela 6 do eSocial ("Classificação Tributária do Contribuinte").
+  esocialTaxClassCode    String?  @map("esocial_tax_class_code")
+  fpasCode               String?  @map("fpas_code")
+  // Código de Risco Ambiental do Trabalho (1, 2 ou 3) usado no GPS/eSocial.
+  ratCode                Int?     @map("rat_code")
+  // Fator Acidentário de Prevenção — multiplica o RAT para achar o INSS patronal real.
+  fapRate                Decimal? @map("fap_rate") @db.Decimal(6, 4)
+  thirdPartiesCode       String?  @map("third_parties_code")
+  addressStreet          String?  @map("address_street")
+  addressNumber          String?  @map("address_number")
+  addressComplement      String?  @map("address_complement")
+  addressNeighborhood    String?  @map("address_neighborhood")
+  addressCity            String?  @map("address_city")
+  addressCityIbgeCode    String?  @map("address_city_ibge_code")
+  addressState           String?  @map("address_state") @db.Char(2)
+  addressZipCode         String?  @map("address_zip_code")
+  phone                  String?
+  email                  String?
+  accountantName         String?  @map("accountant_name")
+  accountantCpf          String?  @map("accountant_cpf")
+  accountantCrc          String?  @map("accountant_crc")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("company_registrations")
+}
+
+// Log de eventos eSocial gerados. `xmlContent` é persistido (não regenerado
+// sob demanda como o SPED) porque, ao contrário de um arquivo SPED de um
+// período fechado, um evento eSocial individual não deveria mudar de
+// conteúdo depois de "emitido" — mesmo raciocínio de imutabilidade dos
+// documentos fiscais (FiscalDocumentoEmitido.documentoJson). `status`/
+// `submissionProtocol` são preenchidos manualmente pelo contador depois de
+// transmitir via seu próprio software com certificado digital — este
+// sistema nunca transmite (mesmo limite do módulo Fiscal).
+model EsocialEvento {
+  id                  String              @id @default(uuid())
+  organizationId      String              @map("organization_id")
+  sequenceNumber      BigInt              @map("sequence_number")
+  // Ex.: "S-2200", "S-1200" — string livre, mesmo padrão de referenceModule em JournalEntry.
+  eventType           String              @map("event_type")
+  employeeId          String?             @map("employee_id")
+  referenceModule     String?             @map("reference_module")
+  referenceId         String?             @map("reference_id")
+  competenceDate       DateTime?          @map("competence_date") @db.Date
+  xmlContent          String              @map("xml_content")
+  status              EsocialEventoStatus @default(GERADO)
+  submissionProtocol  String?             @map("submission_protocol")
+  createdBy           String              @map("created_by")
+  createdAt           DateTime            @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, sequenceNumber])
+  @@index([organizationId, eventType])
+  @@index([organizationId, employeeId])
+  @@map("esocial_eventos")
 }

@@ -88,6 +88,29 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "bank_reconciliation", action: "import" },
   { module: "bank_reconciliation", action: "match" },
   { module: "bank_reconciliation", action: "close" },
+
+  { module: "employees", action: "create" },
+  { module: "employees", action: "read" },
+  { module: "employees", action: "update" },
+
+  { module: "payroll_settings", action: "read" },
+  { module: "payroll_settings", action: "update" },
+
+  { module: "payroll_runs", action: "create" },
+  { module: "payroll_runs", action: "read" },
+  { module: "payroll_runs", action: "post" },
+
+  { module: "vacations", action: "create" },
+  { module: "vacations", action: "read" },
+  { module: "vacations", action: "post" },
+
+  { module: "thirteenth_salary", action: "create" },
+  { module: "thirteenth_salary", action: "read" },
+  { module: "thirteenth_salary", action: "post" },
+
+  { module: "terminations", action: "create" },
+  { module: "terminations", action: "read" },
+  { module: "terminations", action: "post" },
 ];
 
 export function permissionKey(module: string, action: string): string {

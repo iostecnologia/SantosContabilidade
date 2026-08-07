@@ -71,6 +71,39 @@ enum BankStatementLineStatus {
   IGNORED
 }
 
+enum EmployeeStatus {
+  ACTIVE
+  TERMINATED
+}
+
+enum TaxBracketType {
+  INSS
+  IRRF
+}
+
+// Status compartilhado por todo evento de folha (folha mensal, férias, 13º,
+// rescisão): DRAFT (dados carregados, nada calculado) -> CALCULATED (valores
+// computados, ainda sem lançamento contábil) -> POSTED (lançamento gerado,
+// imutável a partir daqui — mesmo raciocínio de BudgetPlan/BankReconciliation).
+enum PayrollEventStatus {
+  DRAFT
+  CALCULATED
+  POSTED
+}
+
+enum ThirteenthSalaryInstallment {
+  FIRST
+  SECOND
+  SINGLE
+}
+
+enum TerminationType {
+  WITHOUT_CAUSE
+  RESIGNATION
+  WITH_CAUSE
+  MUTUAL_AGREEMENT
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -105,6 +138,15 @@ model Organization {
   stockTransfers                StockTransfer[]
   bankReconciliations           BankReconciliation[]
   bankStatementLines            BankStatementLine[]
+  employees                     Employee[]
+  payrollSettings               PayrollSettings?
+  payrollTaxBrackets            PayrollTaxBracket[]
+  payrollRuns                   PayrollRun[]
+  payrollRunLines               PayrollRunLine[]
+  vacations                     Vacation[]
+  thirteenthSalaryRuns          ThirteenthSalaryRun[]
+  thirteenthSalaryRunLines      ThirteenthSalaryRunLine[]
+  terminations                  Termination[]
 
   @@map("organizations")
 }
@@ -225,6 +267,7 @@ model CostCenter {
   accountsReceivable AccountsReceivable[]
   fixedAssets        FixedAsset[]
   budgetLines        BudgetLine[]
+  employees          Employee[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -247,23 +290,34 @@ model Account {
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
-  organization                Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  parent                      Account?             @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children                    Account[]            @relation("AccountHierarchy")
-  costCenter                  CostCenter?          @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  journalEntryLines           JournalEntryLine[]
-  bankAccounts                BankAccount[]
-  apExpenseEntries            AccountsPayable[]    @relation("APExpenseAccount")
-  apLiabilityEntries          AccountsPayable[]    @relation("APLiabilityAccount")
-  arAssetEntries              AccountsReceivable[] @relation("ARAssetAccount")
-  arRevenueEntries            AccountsReceivable[] @relation("ARRevenueAccount")
-  fixedAssetsAsAsset          FixedAsset[]         @relation("FixedAssetAssetAccount")
-  fixedAssetsAsAccumDepr      FixedAsset[]         @relation("FixedAssetAccumDeprAccount")
-  fixedAssetsAsDeprExpense    FixedAsset[]         @relation("FixedAssetDeprExpenseAccount")
-  fixedAssetsAsLossOnDisposal FixedAsset[]         @relation("FixedAssetLossOnDisposalAccount")
-  budgetLines                 BudgetLine[]
-  inventoryItems              InventoryItem[]      @relation("InventoryItemAccount")
-  stockMovementsAsCounter     StockMovement[]      @relation("StockMovementCounterAccount")
+  organization                          Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent                                Account?             @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children                              Account[]            @relation("AccountHierarchy")
+  costCenter                            CostCenter?          @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  journalEntryLines                     JournalEntryLine[]
+  bankAccounts                          BankAccount[]
+  apExpenseEntries                      AccountsPayable[]    @relation("APExpenseAccount")
+  apLiabilityEntries                    AccountsPayable[]    @relation("APLiabilityAccount")
+  arAssetEntries                        AccountsReceivable[] @relation("ARAssetAccount")
+  arRevenueEntries                      AccountsReceivable[] @relation("ARRevenueAccount")
+  fixedAssetsAsAsset                    FixedAsset[]         @relation("FixedAssetAssetAccount")
+  fixedAssetsAsAccumDepr                FixedAsset[]         @relation("FixedAssetAccumDeprAccount")
+  fixedAssetsAsDeprExpense              FixedAsset[]         @relation("FixedAssetDeprExpenseAccount")
+  fixedAssetsAsLossOnDisposal           FixedAsset[]         @relation("FixedAssetLossOnDisposalAccount")
+  budgetLines                           BudgetLine[]
+  inventoryItems                        InventoryItem[]      @relation("InventoryItemAccount")
+  stockMovementsAsCounter               StockMovement[]      @relation("StockMovementCounterAccount")
+  payrollSalaryExpenseSettings          PayrollSettings[]    @relation("PayrollSalaryExpenseAccount")
+  payrollSalaryPayableSettings          PayrollSettings[]    @relation("PayrollSalaryPayableAccount")
+  payrollInssPayableSettings            PayrollSettings[]    @relation("PayrollInssPayableAccount")
+  payrollIrrfPayableSettings            PayrollSettings[]    @relation("PayrollIrrfPayableAccount")
+  payrollEmployerChargesExpenseSettings PayrollSettings[]    @relation("PayrollEmployerChargesExpenseAccount")
+  payrollFgtsPayableSettings            PayrollSettings[]    @relation("PayrollFgtsPayableAccount")
+  payrollEmployerInssPayableSettings    PayrollSettings[]    @relation("PayrollEmployerInssPayableAccount")
+  payrollBenefitsExpenseSettings        PayrollSettings[]    @relation("PayrollBenefitsExpenseAccount")
+  payrollBenefitsPayableSettings        PayrollSettings[]    @relation("PayrollBenefitsPayableAccount")
+  payrollFgtsFineExpenseSettings        PayrollSettings[]    @relation("PayrollFgtsFineExpenseAccount")
+  payrollFgtsFinePayableSettings        PayrollSettings[]    @relation("PayrollFgtsFinePayableAccount")
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -306,6 +360,10 @@ model JournalEntry {
   fixedAssetDisposals           FixedAsset[]                  @relation("FixedAssetDisposal")
   fixedAssetDepreciationEntries FixedAssetDepreciationEntry[] @relation("FixedAssetDepreciationPosting")
   stockMovements                StockMovement[]
+  payrollRuns                   PayrollRun[]
+  vacations                     Vacation[]
+  thirteenthSalaryRuns          ThirteenthSalaryRun[]
+  terminations                  Termination[]
 
   @@unique([organizationId, entryNumber])
   @@index([organizationId, entryDate])
@@ -768,4 +826,278 @@ model BankStatementLine {
   @@index([organizationId, bankReconciliationId])
   @@index([organizationId, bankAccountId, fitId])
   @@map("bank_statement_lines")
+}
+
+// ============================================================================
+// Departamento Pessoal
+// ============================================================================
+// Simplificações assumidas (ver PayrollCalculationService para o detalhe):
+// aviso prévio sempre indenizado (nunca trabalhado); sem salário-família,
+// adicionais de insalubridade/periculosidade, horas extras ou afastamentos;
+// regime de caixa (férias/13º contabilizados quando pagos, sem provisão
+// mensal ao longo do ano); encargos patronais como alíquota agregada
+// configurável (sem quebra INSS patronal/RAT/terceiros); cargo é texto livre
+// no cadastro do funcionário, sem uma entidade própria de cargos/carreira.
+
+model Employee {
+  id                           String         @id @default(uuid())
+  organizationId               String         @map("organization_id")
+  registrationNumber           BigInt         @map("registration_number")
+  fullName                     String         @map("full_name")
+  cpf                          String
+  admissionDate                DateTime       @map("admission_date") @db.Date
+  terminationDate              DateTime?      @map("termination_date") @db.Date
+  position                     String
+  costCenterId                 String?        @map("cost_center_id")
+  baseSalary                   Decimal        @map("base_salary") @db.Decimal(18, 2)
+  dependentsCount              Int            @default(0) @map("dependents_count")
+  transportVoucherMonthlyValue Decimal?       @map("transport_voucher_monthly_value") @db.Decimal(18, 2)
+  mealVoucherMonthlyValue      Decimal?       @map("meal_voucher_monthly_value") @db.Decimal(18, 2)
+  // Percentual (0 a 1) descontado do empregado sobre o valor do vale-refeição/
+  // alimentação — o restante é custo da empresa. Muitas empresas não
+  // descontam nada do empregado (fica null/0).
+  mealVoucherDiscountRate      Decimal?       @map("meal_voucher_discount_rate") @db.Decimal(5, 4)
+  status                       EmployeeStatus @default(ACTIVE)
+  createdBy                    String         @map("created_by")
+  createdAt                    DateTime       @default(now()) @map("created_at")
+  updatedAt                    DateTime       @updatedAt @map("updated_at")
+
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  costCenter            CostCenter?               @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  payrollRunLines       PayrollRunLine[]
+  vacations             Vacation[]
+  thirteenthSalaryLines ThirteenthSalaryRunLine[]
+  terminations          Termination[]
+
+  @@unique([organizationId, registrationNumber])
+  @@unique([organizationId, cpf])
+  @@index([organizationId, status])
+  @@map("employees")
+}
+
+// Singleton por organização — criado sob demanda (get-or-create) com
+// alíquotas/tabelas de referência e nenhuma conta contábil mapeada; o
+// serviço de folha/férias/13º/rescisão recusa calcular enquanto as contas
+// não forem configuradas (mesmo raciocínio de "erro amigável antes do
+// round-trip" usado em BankAccountsService).
+model PayrollSettings {
+  id                              String  @id @default(uuid())
+  organizationId                  String  @unique @map("organization_id")
+  irrfDependentDeduction          Decimal @map("irrf_dependent_deduction") @db.Decimal(18, 2)
+  inssCeiling                     Decimal @map("inss_ceiling") @db.Decimal(18, 2)
+  fgtsRate                        Decimal @map("fgts_rate") @db.Decimal(5, 4)
+  employerInssRate                Decimal @map("employer_inss_rate") @db.Decimal(5, 4)
+  fgtsFineRateWithoutCause        Decimal @map("fgts_fine_rate_without_cause") @db.Decimal(5, 4)
+  fgtsFineRateMutualAgreement     Decimal @map("fgts_fine_rate_mutual_agreement") @db.Decimal(5, 4)
+  transportVoucherMaxDiscountRate Decimal @map("transport_voucher_max_discount_rate") @db.Decimal(5, 4)
+
+  salaryExpenseAccountId          String? @map("salary_expense_account_id")
+  salaryPayableAccountId          String? @map("salary_payable_account_id")
+  inssPayableAccountId            String? @map("inss_payable_account_id")
+  irrfPayableAccountId            String? @map("irrf_payable_account_id")
+  employerChargesExpenseAccountId String? @map("employer_charges_expense_account_id")
+  fgtsPayableAccountId            String? @map("fgts_payable_account_id")
+  employerInssPayableAccountId    String? @map("employer_inss_payable_account_id")
+  benefitsExpenseAccountId        String? @map("benefits_expense_account_id")
+  benefitsPayableAccountId        String? @map("benefits_payable_account_id")
+  fgtsFineExpenseAccountId        String? @map("fgts_fine_expense_account_id")
+  fgtsFinePayableAccountId        String? @map("fgts_fine_payable_account_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization                  Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salaryExpenseAccount          Account?            @relation("PayrollSalaryExpenseAccount", fields: [salaryExpenseAccountId], references: [id], onDelete: Restrict)
+  salaryPayableAccount          Account?            @relation("PayrollSalaryPayableAccount", fields: [salaryPayableAccountId], references: [id], onDelete: Restrict)
+  inssPayableAccount            Account?            @relation("PayrollInssPayableAccount", fields: [inssPayableAccountId], references: [id], onDelete: Restrict)
+  irrfPayableAccount            Account?            @relation("PayrollIrrfPayableAccount", fields: [irrfPayableAccountId], references: [id], onDelete: Restrict)
+  employerChargesExpenseAccount Account?            @relation("PayrollEmployerChargesExpenseAccount", fields: [employerChargesExpenseAccountId], references: [id], onDelete: Restrict)
+  fgtsPayableAccount            Account?            @relation("PayrollFgtsPayableAccount", fields: [fgtsPayableAccountId], references: [id], onDelete: Restrict)
+  employerInssPayableAccount    Account?            @relation("PayrollEmployerInssPayableAccount", fields: [employerInssPayableAccountId], references: [id], onDelete: Restrict)
+  benefitsExpenseAccount        Account?            @relation("PayrollBenefitsExpenseAccount", fields: [benefitsExpenseAccountId], references: [id], onDelete: Restrict)
+  benefitsPayableAccount        Account?            @relation("PayrollBenefitsPayableAccount", fields: [benefitsPayableAccountId], references: [id], onDelete: Restrict)
+  fgtsFineExpenseAccount        Account?            @relation("PayrollFgtsFineExpenseAccount", fields: [fgtsFineExpenseAccountId], references: [id], onDelete: Restrict)
+  fgtsFinePayableAccount        Account?            @relation("PayrollFgtsFinePayableAccount", fields: [fgtsFinePayableAccountId], references: [id], onDelete: Restrict)
+  taxBrackets                   PayrollTaxBracket[]
+
+  @@map("payroll_settings")
+}
+
+// Faixa de tabela progressiva (INSS ou IRRF) no formato "alíquota efetiva
+// menos parcela a deduzir": imposto_da_faixa = base*rate - deduction. Esse
+// formato único serve tanto para IRRF (método oficial) quanto para INSS
+// (progressivo desde a EC 103/2019) — ver PayrollCalculationService.
+model PayrollTaxBracket {
+  id                String         @id @default(uuid())
+  organizationId    String         @map("organization_id")
+  payrollSettingsId String         @map("payroll_settings_id")
+  type              TaxBracketType
+  minBase           Decimal        @map("min_base") @db.Decimal(18, 2)
+  // null = sem teto (última faixa da tabela).
+  maxBase           Decimal?       @map("max_base") @db.Decimal(18, 2)
+  rate              Decimal        @db.Decimal(5, 4)
+  deduction         Decimal        @db.Decimal(18, 2)
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  payrollSettings PayrollSettings @relation(fields: [payrollSettingsId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, payrollSettingsId, type])
+  @@map("payroll_tax_brackets")
+}
+
+model PayrollRun {
+  id              String             @id @default(uuid())
+  organizationId  String             @map("organization_id")
+  runNumber       BigInt             @map("run_number")
+  competenceYear  Int                @map("competence_year")
+  competenceMonth Int                @map("competence_month")
+  status          PayrollEventStatus @default(DRAFT)
+  journalEntryId  String?            @map("journal_entry_id")
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  postedAt        DateTime?          @map("posted_at")
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry?    @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  lines        PayrollRunLine[]
+
+  @@unique([organizationId, competenceYear, competenceMonth])
+  @@unique([organizationId, runNumber])
+  @@index([organizationId, status])
+  @@map("payroll_runs")
+}
+
+model PayrollRunLine {
+  id                       String  @id @default(uuid())
+  organizationId           String  @map("organization_id")
+  payrollRunId             String  @map("payroll_run_id")
+  employeeId               String  @map("employee_id")
+  baseSalary               Decimal @map("base_salary") @db.Decimal(18, 2)
+  inssAmount               Decimal @map("inss_amount") @db.Decimal(18, 2)
+  irrfAmount               Decimal @map("irrf_amount") @db.Decimal(18, 2)
+  fgtsAmount               Decimal @map("fgts_amount") @db.Decimal(18, 2)
+  employerInssAmount       Decimal @map("employer_inss_amount") @db.Decimal(18, 2)
+  transportVoucherDiscount Decimal @default(0) @map("transport_voucher_discount") @db.Decimal(18, 2)
+  mealVoucherBenefit       Decimal @default(0) @map("meal_voucher_benefit") @db.Decimal(18, 2)
+  mealVoucherDiscount      Decimal @default(0) @map("meal_voucher_discount") @db.Decimal(18, 2)
+  netPay                   Decimal @map("net_pay") @db.Decimal(18, 2)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  payrollRun   PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([payrollRunId, employeeId])
+  @@index([organizationId, payrollRunId])
+  @@map("payroll_run_lines")
+}
+
+// Um evento por período aquisitivo gozado — não tenta reconciliar múltiplos
+// períodos aquisitivos em aberto automaticamente (ver comentário de topo).
+model Vacation {
+  id                           String             @id @default(uuid())
+  organizationId               String             @map("organization_id")
+  employeeId                   String             @map("employee_id")
+  acquisitionPeriodStart       DateTime           @map("acquisition_period_start") @db.Date
+  acquisitionPeriodEnd         DateTime           @map("acquisition_period_end") @db.Date
+  startDate                    DateTime           @map("start_date") @db.Date
+  daysTaken                    Int                @map("days_taken")
+  daysSold                     Int                @default(0) @map("days_sold")
+  status                       PayrollEventStatus @default(DRAFT)
+  vacationPay                  Decimal?           @map("vacation_pay") @db.Decimal(18, 2)
+  constitutionalBonus          Decimal?           @map("constitutional_bonus") @db.Decimal(18, 2)
+  sellBonus                    Decimal?           @map("sell_bonus") @db.Decimal(18, 2)
+  sellBonusConstitutionalBonus Decimal?           @map("sell_bonus_constitutional_bonus") @db.Decimal(18, 2)
+  inssAmount                   Decimal?           @map("inss_amount") @db.Decimal(18, 2)
+  irrfAmount                   Decimal?           @map("irrf_amount") @db.Decimal(18, 2)
+  fgtsAmount                   Decimal?           @map("fgts_amount") @db.Decimal(18, 2)
+  employerInssAmount           Decimal?           @map("employer_inss_amount") @db.Decimal(18, 2)
+  netPay                       Decimal?           @map("net_pay") @db.Decimal(18, 2)
+  journalEntryId               String?            @map("journal_entry_id")
+  createdBy                    String             @map("created_by")
+  createdAt                    DateTime           @default(now()) @map("created_at")
+  postedAt                     DateTime?          @map("posted_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, employeeId])
+  @@map("vacations")
+}
+
+model ThirteenthSalaryRun {
+  id             String                      @id @default(uuid())
+  organizationId String                      @map("organization_id")
+  runNumber      BigInt                      @map("run_number")
+  year           Int
+  installment    ThirteenthSalaryInstallment
+  status         PayrollEventStatus          @default(DRAFT)
+  journalEntryId String?                     @map("journal_entry_id")
+  createdBy      String                      @map("created_by")
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  postedAt       DateTime?                   @map("posted_at")
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry?             @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  lines        ThirteenthSalaryRunLine[]
+
+  @@unique([organizationId, year, installment])
+  @@unique([organizationId, runNumber])
+  @@map("thirteenth_salary_runs")
+}
+
+model ThirteenthSalaryRunLine {
+  id                        String  @id @default(uuid())
+  organizationId            String  @map("organization_id")
+  thirteenthSalaryRunId     String  @map("thirteenth_salary_run_id")
+  employeeId                String  @map("employee_id")
+  monthsWorked              Int     @map("months_worked")
+  grossAmount               Decimal @map("gross_amount") @db.Decimal(18, 2)
+  previousInstallmentAmount Decimal @default(0) @map("previous_installment_amount") @db.Decimal(18, 2)
+  inssAmount                Decimal @default(0) @map("inss_amount") @db.Decimal(18, 2)
+  irrfAmount                Decimal @default(0) @map("irrf_amount") @db.Decimal(18, 2)
+  fgtsAmount                Decimal @default(0) @map("fgts_amount") @db.Decimal(18, 2)
+  employerInssAmount        Decimal @default(0) @map("employer_inss_amount") @db.Decimal(18, 2)
+  netPay                    Decimal @map("net_pay") @db.Decimal(18, 2)
+
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  thirteenthSalaryRun ThirteenthSalaryRun @relation(fields: [thirteenthSalaryRunId], references: [id], onDelete: Cascade)
+  employee            Employee            @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([thirteenthSalaryRunId, employeeId])
+  @@map("thirteenth_salary_run_lines")
+}
+
+// Uma por funcionário (não pode ser desligado duas vezes) — verbas variam
+// por `type` (ver PayrollCalculationService.calculateTermination).
+model Termination {
+  id                           String             @id @default(uuid())
+  organizationId               String             @map("organization_id")
+  employeeId                   String             @map("employee_id")
+  terminationDate              DateTime           @map("termination_date") @db.Date
+  type                         TerminationType
+  status                       PayrollEventStatus @default(DRAFT)
+  noticeDays                   Int?               @map("notice_days")
+  balanceSalaryAmount          Decimal?           @map("balance_salary_amount") @db.Decimal(18, 2)
+  noticeIndemnityAmount        Decimal?           @map("notice_indemnity_amount") @db.Decimal(18, 2)
+  proportionalThirteenthAmount Decimal?           @map("proportional_thirteenth_amount") @db.Decimal(18, 2)
+  vestedVacationAmount         Decimal?           @map("vested_vacation_amount") @db.Decimal(18, 2)
+  proportionalVacationAmount   Decimal?           @map("proportional_vacation_amount") @db.Decimal(18, 2)
+  vacationConstitutionalBonus  Decimal?           @map("vacation_constitutional_bonus") @db.Decimal(18, 2)
+  fgtsFineAmount               Decimal?           @map("fgts_fine_amount") @db.Decimal(18, 2)
+  inssAmount                   Decimal?           @map("inss_amount") @db.Decimal(18, 2)
+  irrfAmount                   Decimal?           @map("irrf_amount") @db.Decimal(18, 2)
+  netPay                       Decimal?           @map("net_pay") @db.Decimal(18, 2)
+  journalEntryId               String?            @map("journal_entry_id")
+  createdBy                    String             @map("created_by")
+  createdAt                    DateTime           @default(now()) @map("created_at")
+  postedAt                     DateTime?          @map("posted_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId])
+  @@index([organizationId, employeeId])
+  @@map("terminations")
 }

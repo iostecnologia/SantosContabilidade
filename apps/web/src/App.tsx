@@ -10,6 +10,7 @@ import { JournalEntriesPage } from "./pages/journal-entries/JournalEntriesPage";
 import { FinanceiroPage } from "./pages/financeiro/FinanceiroPage";
 import { BankReconciliationPage } from "./pages/bank-reconciliation/BankReconciliationPage";
 import { UsersPage } from "./pages/users/UsersPage";
+import { DepartamentoPessoalPage } from "./pages/departamento-pessoal/DepartamentoPessoalPage";
 import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
@@ -104,6 +105,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <UsersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/departamento-pessoal"
+        element={
+          <ProtectedRoute>
+            <DepartamentoPessoalPage />
           </ProtectedRoute>
         }
       />

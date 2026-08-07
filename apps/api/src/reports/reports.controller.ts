@@ -48,4 +48,16 @@ export class ReportsController {
   cashFlow(@CurrentUser() user: AuthenticatedUser, @Query() query: CashFlowQueryDto) {
     return this.reportsService.cashFlow(user.organizationId, query);
   }
+
+  @Get("income-statement-legal")
+  @RequirePermission("reports:read")
+  incomeStatementLegal(@CurrentUser() user: AuthenticatedUser, @Query() query: IncomeStatementQueryDto) {
+    return this.reportsService.incomeStatementLegal(user.organizationId, query);
+  }
+
+  @Get("balance-sheet-legal")
+  @RequirePermission("reports:read")
+  balanceSheetLegal(@CurrentUser() user: AuthenticatedUser, @Query() query: BalanceSheetQueryDto) {
+    return this.reportsService.balanceSheetLegal(user.organizationId, query);
+  }
 }

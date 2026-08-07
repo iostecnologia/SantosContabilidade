@@ -326,6 +326,16 @@ model Account {
   // configurado uma vez" do FiscalTaxSettings. Null = conta ainda não
   // mapeada; ECD/ECF avisam quais contas faltam em vez de falhar silenciosamente.
   spedReferenceCode String?  @map("sped_reference_code")
+  // Grupo do leiaute legal de DRE/Balanço (Lei 6.404/76 art. 187/178, CPC 26)
+  // esta conta pertence a — ex.: "ATIVO_CIRCULANTE", "RECEITA_BRUTA",
+  // "DESPESAS_ADMINISTRATIVAS". String livre (não enum) pelo mesmo motivo de
+  // `referenceModule` em JournalEntry: o conjunto válido depende do `type`
+  // da conta e é definido/validado em código (ver
+  // `reports/domain/legal-statement-groups.ts`), não faz sentido reimplementar
+  // essa hierarquia inteira como enum de banco. Null = conta ainda não
+  // classificada; os relatórios legais avisam quais contas faltam em vez de
+  // falhar silenciosamente (mesmo padrão de spedReferenceCode acima).
+  legalStatementGroup String? @map("legal_statement_group")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 

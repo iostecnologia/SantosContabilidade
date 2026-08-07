@@ -34,6 +34,8 @@ export interface Account {
   costCenterId: string | null;
   // Código do plano de contas referencial da RFB — usado por ECD (I051) e ECF (J051).
   spedReferenceCode: string | null;
+  // Grupo do leiaute legal de DRE/Balanço (Lei 6.404/76) — ver types/legal-statement-groups.ts.
+  legalStatementGroup: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +53,7 @@ export interface UpdateAccountInput {
   isActive?: boolean;
   costCenterId?: string;
   spedReferenceCode?: string;
+  legalStatementGroup?: string;
 }
 
 export type LineDirection = "DEBIT" | "CREDIT";

@@ -20,4 +20,12 @@ export class UpdateAccountDto {
   @IsString()
   @MaxLength(40)
   spedReferenceCode?: string;
+
+  // Grupo do leiaute legal de DRE/Balanço — ver reports/domain/legal-statement-groups.ts.
+  // Validado contra o `type` da conta em AccountsService.update (o conjunto
+  // válido depende do tipo, não dá pra expressar isso num decorator sozinho).
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  legalStatementGroup?: string;
 }

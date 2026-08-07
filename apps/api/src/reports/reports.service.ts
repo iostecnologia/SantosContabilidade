@@ -7,6 +7,7 @@ import { GeneralLedgerQueryDto } from "./dto/general-ledger-query.dto";
 import { IncomeStatementQueryDto } from "./dto/income-statement-query.dto";
 import { BalanceSheetQueryDto } from "./dto/balance-sheet-query.dto";
 import { CashFlowQueryDto } from "./dto/cash-flow-query.dto";
+import { LEGAL_STATEMENT_GROUPS_BY_TYPE } from "./domain/legal-statement-groups";
 
 const CREDIT_NORMAL_TYPES = new Set(["LIABILITY", "EQUITY", "REVENUE"]);
 
@@ -269,6 +270,199 @@ export class ReportsService {
       totalAssets,
       totalLiabilities,
       totalEquity,
+    };
+  }
+
+  // DRE no leiaute legal (Lei 6.404/76 art. 187) — agrupa REVENUE/EXPENSE por
+  // `Account.legalStatementGroup` em vez de listar conta a conta como
+  // incomeStatement() faz. Contas do tipo certo sem grupo atribuído são
+  // reportadas em `contasSemClassificacao` e simplesmente não entram na soma
+  // de nenhum grupo (avisa em vez de falhar, mesmo padrão de spedReferenceCode).
+  async incomeStatementLegal(organizationId: string, dto: IncomeStatementQueryDto) {
+    const costCenterFilter = dto.costCenterId ? Prisma.sql`AND jel.cost_center_id = ${dto.costCenterId}` : Prisma.empty;
+
+    const rows = await this.tx.$queryRaw<AccountMovementRow[]>`
+      SELECT jel.account_id AS "accountId",
+        SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netDebit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON je.id = jel.journal_entry_id
+      JOIN accounts a ON a.id = jel.account_id
+      WHERE jel.organization_id = ${organizationId} AND a.type IN ('REVENUE', 'EXPENSE')
+        AND je.competence_date BETWEEN ${dto.startDate}::date AND ${dto.endDate}::date
+        ${costCenterFilter}
+      GROUP BY jel.account_id
+    `;
+
+    const accounts = await this.tx.account.findMany({ where: { organizationId, type: { in: ["REVENUE", "EXPENSE"] } } });
+    const accountById = new Map(accounts.map((a) => [a.id, a]));
+    const contasSemClassificacao = accounts.filter((a) => a.isAnalytic && a.isActive && !a.legalStatementGroup).map((a) => a.code);
+
+    const groupTotals = new Map<string, number>();
+    const groupLines = new Map<string, { accountId: string; code: string; name: string; amount: number }[]>();
+    for (const row of rows) {
+      const account = accountById.get(row.accountId);
+      if (!account?.legalStatementGroup) continue;
+      const amount = account.type === "REVENUE" ? -row.netDebit : row.netDebit;
+      groupTotals.set(account.legalStatementGroup, (groupTotals.get(account.legalStatementGroup) ?? 0) + amount);
+      const lines = groupLines.get(account.legalStatementGroup) ?? [];
+      lines.push({ accountId: account.id, code: account.code, name: account.name, amount });
+      groupLines.set(account.legalStatementGroup, lines);
+    }
+
+    const allGroupDefs = [...LEGAL_STATEMENT_GROUPS_BY_TYPE.REVENUE, ...LEGAL_STATEMENT_GROUPS_BY_TYPE.EXPENSE];
+    const groupResult = (key: string) => ({
+      key,
+      label: allGroupDefs.find((g) => g.key === key)!.label,
+      lines: (groupLines.get(key) ?? []).sort((a, b) => a.code.localeCompare(b.code)),
+      total: groupTotals.get(key) ?? 0,
+    });
+
+    const receitaBruta = groupResult("RECEITA_BRUTA");
+    const deducoesReceita = groupResult("DEDUCOES_RECEITA");
+    const receitaLiquida = receitaBruta.total + deducoesReceita.total;
+    const custoMercadoriasServicos = groupResult("CUSTO_MERCADORIAS_SERVICOS");
+    const lucroBruto = receitaLiquida - custoMercadoriasServicos.total;
+    const despesasVendas = groupResult("DESPESAS_VENDAS");
+    const despesasAdministrativas = groupResult("DESPESAS_ADMINISTRATIVAS");
+    const outrasReceitasOperacionais = groupResult("OUTRAS_RECEITAS_OPERACIONAIS");
+    const outrasDespesasOperacionais = groupResult("OUTRAS_DESPESAS_OPERACIONAIS");
+    const resultadoOperacional =
+      lucroBruto -
+      despesasVendas.total -
+      despesasAdministrativas.total +
+      outrasReceitasOperacionais.total -
+      outrasDespesasOperacionais.total;
+    const receitasFinanceiras = groupResult("RECEITAS_FINANCEIRAS");
+    const despesasFinanceiras = groupResult("DESPESAS_FINANCEIRAS");
+    const resultadoAntesTributos = resultadoOperacional + receitasFinanceiras.total - despesasFinanceiras.total;
+    const irpjCsll = groupResult("IRPJ_CSLL");
+    const lucroLiquido = resultadoAntesTributos - irpjCsll.total;
+
+    return {
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      contasSemClassificacao,
+      receitaBruta,
+      deducoesReceita,
+      receitaLiquida,
+      custoMercadoriasServicos,
+      lucroBruto,
+      despesasVendas,
+      despesasAdministrativas,
+      outrasReceitasOperacionais,
+      outrasDespesasOperacionais,
+      resultadoOperacional,
+      receitasFinanceiras,
+      despesasFinanceiras,
+      resultadoAntesTributos,
+      irpjCsll,
+      lucroLiquido,
+    };
+  }
+
+  // Balanço no leiaute legal (Lei 6.404/76 art. 178) — mesmo raciocínio de
+  // incomeStatementLegal(), agrupando ASSET/LIABILITY/EQUITY por
+  // `Account.legalStatementGroup`. Simplificação assumida (documentada em
+  // legal-statement-groups.ts): Passivo Circulante/Não Circulante não abre em
+  // subgrupos (fornecedores/empréstimos/obrigações etc.), só o nível mínimo
+  // exigido por lei.
+  async balanceSheetLegal(organizationId: string, dto: BalanceSheetQueryDto) {
+    const costCenterFilter = dto.costCenterId ? Prisma.sql`AND jel.cost_center_id = ${dto.costCenterId}` : Prisma.empty;
+
+    const balanceRows = await this.tx.$queryRaw<AccountMovementRow[]>`
+      SELECT jel.account_id AS "accountId",
+        SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netDebit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON je.id = jel.journal_entry_id
+      JOIN accounts a ON a.id = jel.account_id
+      WHERE jel.organization_id = ${organizationId} AND a.type IN ('ASSET', 'LIABILITY', 'EQUITY')
+        AND je.competence_date <= ${dto.asOfDate}::date
+        ${costCenterFilter}
+      GROUP BY jel.account_id
+    `;
+    const resultRows = await this.tx.$queryRaw<AccountMovementRow[]>`
+      SELECT jel.account_id AS "accountId",
+        SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netDebit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON je.id = jel.journal_entry_id
+      JOIN accounts a ON a.id = jel.account_id
+      WHERE jel.organization_id = ${organizationId} AND a.type IN ('REVENUE', 'EXPENSE')
+        AND je.competence_date <= ${dto.asOfDate}::date
+        ${costCenterFilter}
+      GROUP BY jel.account_id
+    `;
+    const netIncome = resultRows.reduce((sum, r) => sum - r.netDebit, 0);
+
+    const accounts = await this.tx.account.findMany({ where: { organizationId, type: { in: ["ASSET", "LIABILITY", "EQUITY"] } } });
+    const accountById = new Map(accounts.map((a) => [a.id, a]));
+    const contasSemClassificacao = accounts.filter((a) => a.isAnalytic && a.isActive && !a.legalStatementGroup).map((a) => a.code);
+
+    const groupTotals = new Map<string, number>();
+    const groupLines = new Map<string, { accountId: string; code: string; name: string; amount: number }[]>();
+    for (const row of balanceRows) {
+      const account = accountById.get(row.accountId);
+      if (!account?.legalStatementGroup) continue;
+      const amount = account.type === "ASSET" ? row.netDebit : -row.netDebit;
+      groupTotals.set(account.legalStatementGroup, (groupTotals.get(account.legalStatementGroup) ?? 0) + amount);
+      const lines = groupLines.get(account.legalStatementGroup) ?? [];
+      lines.push({ accountId: account.id, code: account.code, name: account.name, amount });
+      groupLines.set(account.legalStatementGroup, lines);
+    }
+
+    const allGroupDefs = [
+      ...LEGAL_STATEMENT_GROUPS_BY_TYPE.ASSET,
+      ...LEGAL_STATEMENT_GROUPS_BY_TYPE.LIABILITY,
+      ...LEGAL_STATEMENT_GROUPS_BY_TYPE.EQUITY,
+    ];
+    const groupResult = (key: string) => ({
+      key,
+      label: allGroupDefs.find((g) => g.key === key)!.label,
+      lines: (groupLines.get(key) ?? []).sort((a, b) => a.code.localeCompare(b.code)),
+      total: groupTotals.get(key) ?? 0,
+    });
+
+    const ativoCirculante = groupResult("ATIVO_CIRCULANTE");
+    const ativoRealizavelLongoPrazo = groupResult("ATIVO_REALIZAVEL_LONGO_PRAZO");
+    const ativoInvestimentos = groupResult("ATIVO_INVESTIMENTOS");
+    const ativoImobilizado = groupResult("ATIVO_IMOBILIZADO");
+    const ativoIntangivel = groupResult("ATIVO_INTANGIVEL");
+    const ativoNaoCirculanteTotal =
+      ativoRealizavelLongoPrazo.total + ativoInvestimentos.total + ativoImobilizado.total + ativoIntangivel.total;
+    const totalAtivo = ativoCirculante.total + ativoNaoCirculanteTotal;
+
+    const passivoCirculante = groupResult("PASSIVO_CIRCULANTE");
+    const passivoNaoCirculante = groupResult("PASSIVO_NAO_CIRCULANTE");
+    const plCapitalSocial = groupResult("PL_CAPITAL_SOCIAL");
+    const plReservasCapital = groupResult("PL_RESERVAS_CAPITAL");
+    const plReservasLucros = groupResult("PL_RESERVAS_LUCROS");
+    const plLucrosAcumulados = groupResult("PL_LUCROS_ACUMULADOS");
+    const totalPatrimonioLiquido =
+      plCapitalSocial.total + plReservasCapital.total + plReservasLucros.total + plLucrosAcumulados.total + netIncome;
+    const totalPassivoMaisPatrimonioLiquido = passivoCirculante.total + passivoNaoCirculante.total + totalPatrimonioLiquido;
+
+    return {
+      asOfDate: dto.asOfDate,
+      contasSemClassificacao,
+      ativoCirculante,
+      ativoNaoCirculante: {
+        realizavelLongoPrazo: ativoRealizavelLongoPrazo,
+        investimentos: ativoInvestimentos,
+        imobilizado: ativoImobilizado,
+        intangivel: ativoIntangivel,
+        total: ativoNaoCirculanteTotal,
+      },
+      totalAtivo,
+      passivoCirculante,
+      passivoNaoCirculante,
+      patrimonioLiquido: {
+        capitalSocial: plCapitalSocial,
+        reservasCapital: plReservasCapital,
+        reservasLucros: plReservasLucros,
+        lucrosAcumulados: plLucrosAcumulados,
+        resultadoDoExercicio: netIncome,
+        total: totalPatrimonioLiquido,
+      },
+      totalPassivoMaisPatrimonioLiquido,
     };
   }
 

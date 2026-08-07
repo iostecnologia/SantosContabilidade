@@ -11,6 +11,7 @@ import { Input, Select } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
 import { Card } from "../../components/ui/Card";
 import type { Account, AccountType, CostCenter } from "../../types/accounting";
+import { LEGAL_STATEMENT_GROUPS_BY_TYPE } from "../../types/legal-statement-groups";
 
 const ACCOUNT_TYPES: AccountType[] = ["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"];
 
@@ -28,6 +29,7 @@ const editSchema = z.object({
   isActive: z.boolean(),
   costCenterId: z.string().optional(),
   spedReferenceCode: z.string().max(40).optional(),
+  legalStatementGroup: z.string().max(60).optional(),
 });
 type EditValues = z.infer<typeof editSchema>;
 
@@ -294,14 +296,21 @@ function EditModal({
       isActive: account.isActive,
       costCenterId: account.costCenterId ?? "",
       spedReferenceCode: account.spedReferenceCode ?? "",
+      legalStatementGroup: account.legalStatementGroup ?? "",
     },
   });
+  const groupOptions = LEGAL_STATEMENT_GROUPS_BY_TYPE[account.type];
 
   return (
     <Modal title={`Editar "${account.code}"`} onClose={onClose}>
       <form
         onSubmit={handleSubmit((values) =>
-          onSubmit({ ...values, costCenterId: values.costCenterId || undefined, spedReferenceCode: values.spedReferenceCode || undefined }),
+          onSubmit({
+            ...values,
+            costCenterId: values.costCenterId || undefined,
+            spedReferenceCode: values.spedReferenceCode || undefined,
+            legalStatementGroup: values.legalStatementGroup || undefined,
+          }),
         )}
         className="flex flex-col gap-4"
       >
@@ -319,6 +328,14 @@ function EditModal({
           {...register("spedReferenceCode")}
           error={errors.spedReferenceCode?.message}
         />
+        <Select label="Grupo do demonstrativo legal (DRE/Balanço)" {...register("legalStatementGroup")}>
+          <option value="">— não classificada —</option>
+          {groupOptions.map((g) => (
+            <option key={g.key} value={g.key}>
+              {g.label}
+            </option>
+          ))}
+        </Select>
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input type="checkbox" {...register("isActive")} className="h-4 w-4 rounded border-slate-700 bg-slate-900" />
           Ativa

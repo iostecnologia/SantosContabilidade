@@ -4,8 +4,17 @@ import { GeneralLedgerTab } from "./GeneralLedgerTab";
 import { IncomeStatementTab } from "./IncomeStatementTab";
 import { BalanceSheetTab } from "./BalanceSheetTab";
 import { CashFlowTab } from "./CashFlowTab";
+import { IncomeStatementLegalTab } from "./IncomeStatementLegalTab";
+import { BalanceSheetLegalTab } from "./BalanceSheetLegalTab";
 
-type TabKey = "trial-balance" | "general-ledger" | "income-statement" | "balance-sheet" | "cash-flow";
+type TabKey =
+  | "trial-balance"
+  | "general-ledger"
+  | "income-statement"
+  | "balance-sheet"
+  | "cash-flow"
+  | "income-statement-legal"
+  | "balance-sheet-legal";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trial-balance", label: "Balancete" },
@@ -13,6 +22,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "income-statement", label: "DRE" },
   { key: "balance-sheet", label: "Balanço Patrimonial" },
   { key: "cash-flow", label: "Fluxo de Caixa" },
+  { key: "income-statement-legal", label: "DRE (Leiaute Legal)" },
+  { key: "balance-sheet-legal", label: "Balanço (Leiaute Legal)" },
 ];
 
 export function ReportsPage() {
@@ -22,7 +33,7 @@ export function ReportsPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Relatórios</h1>
 
-      <div className="flex gap-1 border-b border-slate-800">
+      <div className="flex flex-wrap gap-1 border-b border-slate-800">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -41,6 +52,8 @@ export function ReportsPage() {
       {tab === "income-statement" && <IncomeStatementTab />}
       {tab === "balance-sheet" && <BalanceSheetTab />}
       {tab === "cash-flow" && <CashFlowTab />}
+      {tab === "income-statement-legal" && <IncomeStatementLegalTab />}
+      {tab === "balance-sheet-legal" && <BalanceSheetLegalTab />}
     </div>
   );
 }

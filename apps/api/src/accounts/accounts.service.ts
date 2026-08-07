@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaTransactionAdapter } from "../tenancy/tenancy.module";
 import { CreateAccountDto } from "./dto/create-account.dto";
 import { UpdateAccountDto } from "./dto/update-account.dto";
+import { isValidLegalStatementGroup } from "../reports/domain/legal-statement-groups";
 
 /**
  * Regras de hierarquia (só folha é analítica, só analítica recebe
@@ -52,9 +53,12 @@ export class AccountsService {
   }
 
   async update(organizationId: string, id: string, dto: UpdateAccountDto) {
-    await this.findOneOrThrow(organizationId, id);
+    const account = await this.findOneOrThrow(organizationId, id);
     if (dto.costCenterId) {
       await this.ensureCostCenterExists(organizationId, dto.costCenterId);
+    }
+    if (dto.legalStatementGroup && !isValidLegalStatementGroup(account.type, dto.legalStatementGroup)) {
+      throw new BadRequestException(`Grupo de demonstrativo legal inválido para uma conta do tipo ${account.type}.`);
     }
     return this.tx.account.update({
       where: { id },
@@ -63,6 +67,7 @@ export class AccountsService {
         isActive: dto.isActive,
         costCenterId: dto.costCenterId,
         spedReferenceCode: dto.spedReferenceCode,
+        legalStatementGroup: dto.legalStatementGroup,
       },
     });
   }

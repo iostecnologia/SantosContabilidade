@@ -88,6 +88,66 @@ export interface CashFlowCategory {
   total: number;
 }
 
+export interface LegalGroupLine {
+  accountId: string;
+  code: string;
+  name: string;
+  amount: number;
+}
+
+export interface LegalGroupResult {
+  key: string;
+  label: string;
+  lines: LegalGroupLine[];
+  total: number;
+}
+
+export interface IncomeStatementLegalReport {
+  startDate: string;
+  endDate: string;
+  contasSemClassificacao: string[];
+  receitaBruta: LegalGroupResult;
+  deducoesReceita: LegalGroupResult;
+  receitaLiquida: number;
+  custoMercadoriasServicos: LegalGroupResult;
+  lucroBruto: number;
+  despesasVendas: LegalGroupResult;
+  despesasAdministrativas: LegalGroupResult;
+  outrasReceitasOperacionais: LegalGroupResult;
+  outrasDespesasOperacionais: LegalGroupResult;
+  resultadoOperacional: number;
+  receitasFinanceiras: LegalGroupResult;
+  despesasFinanceiras: LegalGroupResult;
+  resultadoAntesTributos: number;
+  irpjCsll: LegalGroupResult;
+  lucroLiquido: number;
+}
+
+export interface BalanceSheetLegalReport {
+  asOfDate: string;
+  contasSemClassificacao: string[];
+  ativoCirculante: LegalGroupResult;
+  ativoNaoCirculante: {
+    realizavelLongoPrazo: LegalGroupResult;
+    investimentos: LegalGroupResult;
+    imobilizado: LegalGroupResult;
+    intangivel: LegalGroupResult;
+    total: number;
+  };
+  totalAtivo: number;
+  passivoCirculante: LegalGroupResult;
+  passivoNaoCirculante: LegalGroupResult;
+  patrimonioLiquido: {
+    capitalSocial: LegalGroupResult;
+    reservasCapital: LegalGroupResult;
+    reservasLucros: LegalGroupResult;
+    lucrosAcumulados: LegalGroupResult;
+    resultadoDoExercicio: number;
+    total: number;
+  };
+  totalPassivoMaisPatrimonioLiquido: number;
+}
+
 export interface CashFlowReport {
   startDate: string;
   endDate: string;

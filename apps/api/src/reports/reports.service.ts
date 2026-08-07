@@ -6,6 +6,7 @@ import { TrialBalanceQueryDto } from "./dto/trial-balance-query.dto";
 import { GeneralLedgerQueryDto } from "./dto/general-ledger-query.dto";
 import { IncomeStatementQueryDto } from "./dto/income-statement-query.dto";
 import { BalanceSheetQueryDto } from "./dto/balance-sheet-query.dto";
+import { CashFlowQueryDto } from "./dto/cash-flow-query.dto";
 
 const CREDIT_NORMAL_TYPES = new Set(["LIABILITY", "EQUITY", "REVENUE"]);
 
@@ -268,6 +269,125 @@ export class ReportsService {
       totalAssets,
       totalLiabilities,
       totalEquity,
+    };
+  }
+
+  // DFC simplificada, método direto: "caixa" = contas contábeis apontadas por
+  // BankAccount.glAccountId (kind BANK ou CASH), sem distinguir as duas — é o
+  // "caixa e equivalentes de caixa" da DFC. Cada lançamento que toca uma
+  // conta-caixa vira uma linha, classificada em Operacional/Investimento/
+  // Financiamento por um sinal fraco (referenceModule/tipo da contrapartida),
+  // não por um plano de contas com marcação DFC explícita — o sistema não tem
+  // esse conceito. FIXED_ASSET vira Investimento; contrapartida em conta
+  // EQUITY (aporte de capital, distribuição de lucros) vira Financiamento;
+  // todo o resto (AP/AR/folha/fiscal/manual operacional, inclusive
+  // empréstimos lançados manualmente contra uma conta de passivo) cai em
+  // Operacional por padrão — confira antes de usar, mesmo raciocínio de
+  // "confira antes de usar" já assumido pelas tabelas de INSS/IRRF/Simples.
+  // Lançamentos de transferência entre duas contas-caixa (ex.: banco A para
+  // banco B) somam líquido zero nas linhas de caixa do mesmo lançamento e são
+  // automaticamente excluídos — não é uma entrada/saída real de caixa.
+  async cashFlow(organizationId: string, dto: CashFlowQueryDto) {
+    const bankAccounts = await this.tx.bankAccount.findMany({
+      where: { organizationId },
+      include: { glAccount: true },
+    });
+    const cashAccountIds = [...new Set(bankAccounts.map((ba) => ba.glAccountId))];
+
+    if (cashAccountIds.length === 0) {
+      return {
+        startDate: dto.startDate,
+        endDate: dto.endDate,
+        contasCaixa: [],
+        openingBalance: 0,
+        closingBalance: 0,
+        operating: { lines: [], total: 0 },
+        investing: { lines: [], total: 0 },
+        financing: { lines: [], total: 0 },
+        netChange: 0,
+      };
+    }
+
+    const balanceAsOf = async (date: string) => {
+      const rows = await this.tx.$queryRaw<{ netDebit: number }[]>`
+        SELECT SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netDebit"
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.journal_entry_id
+        WHERE jel.organization_id = ${organizationId} AND jel.account_id IN (${Prisma.join(cashAccountIds)})
+          AND je.competence_date < ${date}::date
+      `;
+      return rows[0]?.netDebit ?? 0;
+    };
+    const balanceThrough = async (date: string) => {
+      const rows = await this.tx.$queryRaw<{ netDebit: number }[]>`
+        SELECT SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netDebit"
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.journal_entry_id
+        WHERE jel.organization_id = ${organizationId} AND jel.account_id IN (${Prisma.join(cashAccountIds)})
+          AND je.competence_date <= ${date}::date
+      `;
+      return rows[0]?.netDebit ?? 0;
+    };
+
+    const [openingBalance, closingBalance] = await Promise.all([balanceAsOf(dto.startDate), balanceThrough(dto.endDate)]);
+
+    const periodRows = await this.tx.$queryRaw<{ journalEntryId: string; netCash: number }[]>`
+      SELECT jel.journal_entry_id AS "journalEntryId",
+        SUM(CASE WHEN jel.direction = 'DEBIT' THEN jel.amount ELSE -jel.amount END)::float8 AS "netCash"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON je.id = jel.journal_entry_id
+      WHERE jel.organization_id = ${organizationId} AND jel.account_id IN (${Prisma.join(cashAccountIds)})
+        AND je.competence_date BETWEEN ${dto.startDate}::date AND ${dto.endDate}::date
+      GROUP BY jel.journal_entry_id
+    `;
+    const netCashByEntry = new Map(periodRows.filter((r) => Math.abs(r.netCash) > 0.005).map((r) => [r.journalEntryId, r.netCash]));
+
+    const entries =
+      netCashByEntry.size === 0
+        ? []
+        : await this.tx.journalEntry.findMany({
+            where: { id: { in: [...netCashByEntry.keys()] }, organizationId },
+            include: { lines: { include: { account: true } } },
+            orderBy: [{ entryDate: "asc" }, { entryNumber: "asc" }],
+          });
+
+    const cashAccountIdSet = new Set(cashAccountIds);
+    type Categoria = "OPERATING" | "INVESTING" | "FINANCING";
+    const buckets: Record<Categoria, { lines: unknown[]; total: number }> = {
+      OPERATING: { lines: [], total: 0 },
+      INVESTING: { lines: [], total: 0 },
+      FINANCING: { lines: [], total: 0 },
+    };
+
+    for (const entry of entries) {
+      const netCash = netCashByEntry.get(entry.id) ?? 0;
+      let categoria: Categoria = "OPERATING";
+      if (entry.referenceModule === "FIXED_ASSET") {
+        categoria = "INVESTING";
+      } else if (entry.lines.some((l) => !cashAccountIdSet.has(l.accountId) && l.account.type === "EQUITY")) {
+        categoria = "FINANCING";
+      }
+      buckets[categoria].lines.push({
+        journalEntryId: entry.id,
+        entryNumber: entry.entryNumber.toString(),
+        entryDate: entry.entryDate,
+        description: entry.description,
+        referenceModule: entry.referenceModule,
+        amount: netCash,
+      });
+      buckets[categoria].total += netCash;
+    }
+
+    return {
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      contasCaixa: bankAccounts.map((ba) => ({ id: ba.id, name: ba.name, kind: ba.kind, accountCode: ba.glAccount.code })),
+      openingBalance,
+      closingBalance,
+      operating: buckets.OPERATING,
+      investing: buckets.INVESTING,
+      financing: buckets.FINANCING,
+      netChange: buckets.OPERATING.total + buckets.INVESTING.total + buckets.FINANCING.total,
     };
   }
 

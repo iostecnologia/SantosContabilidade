@@ -73,3 +73,29 @@ export interface BalanceSheetReport {
   totalLiabilities: number;
   totalEquity: number;
 }
+
+export interface CashFlowLine {
+  journalEntryId: string;
+  entryNumber: string;
+  entryDate: string;
+  description: string;
+  referenceModule: string;
+  amount: number;
+}
+
+export interface CashFlowCategory {
+  lines: CashFlowLine[];
+  total: number;
+}
+
+export interface CashFlowReport {
+  startDate: string;
+  endDate: string;
+  contasCaixa: { id: string; name: string; kind: "BANK" | "CASH"; accountCode: string }[];
+  openingBalance: number;
+  closingBalance: number;
+  operating: CashFlowCategory;
+  investing: CashFlowCategory;
+  financing: CashFlowCategory;
+  netChange: number;
+}

@@ -3,14 +3,16 @@ import { TrialBalanceTab } from "./TrialBalanceTab";
 import { GeneralLedgerTab } from "./GeneralLedgerTab";
 import { IncomeStatementTab } from "./IncomeStatementTab";
 import { BalanceSheetTab } from "./BalanceSheetTab";
+import { CashFlowTab } from "./CashFlowTab";
 
-type TabKey = "trial-balance" | "general-ledger" | "income-statement" | "balance-sheet";
+type TabKey = "trial-balance" | "general-ledger" | "income-statement" | "balance-sheet" | "cash-flow";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "trial-balance", label: "Balancete" },
   { key: "general-ledger", label: "Livro Razão" },
   { key: "income-statement", label: "DRE" },
   { key: "balance-sheet", label: "Balanço Patrimonial" },
+  { key: "cash-flow", label: "Fluxo de Caixa" },
 ];
 
 export function ReportsPage() {
@@ -38,6 +40,7 @@ export function ReportsPage() {
       {tab === "general-ledger" && <GeneralLedgerTab />}
       {tab === "income-statement" && <IncomeStatementTab />}
       {tab === "balance-sheet" && <BalanceSheetTab />}
+      {tab === "cash-flow" && <CashFlowTab />}
     </div>
   );
 }

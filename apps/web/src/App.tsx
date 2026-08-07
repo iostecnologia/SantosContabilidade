@@ -11,6 +11,7 @@ import { FinanceiroPage } from "./pages/financeiro/FinanceiroPage";
 import { BankReconciliationPage } from "./pages/bank-reconciliation/BankReconciliationPage";
 import { UsersPage } from "./pages/users/UsersPage";
 import { DepartamentoPessoalPage } from "./pages/departamento-pessoal/DepartamentoPessoalPage";
+import { FiscalPage } from "./pages/fiscal/FiscalPage";
 import { BudgetPage } from "./pages/budget/BudgetPage";
 import { WarehousePage } from "./pages/warehouse/WarehousePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
@@ -113,6 +114,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <DepartamentoPessoalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fiscal"
+        element={
+          <ProtectedRoute>
+            <FiscalPage />
           </ProtectedRoute>
         }
       />

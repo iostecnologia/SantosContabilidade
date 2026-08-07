@@ -43,6 +43,20 @@ export interface ItemDocumentoFiscal {
   valorTotal: number;
   /** Rateio explícito: se omitido, usa `centroCustoPadraoId` do documento. */
   centroCustoId?: string;
+  /** Classificação fiscal — usada pela apuração automática de tributos (ver ApuracaoTributariaService). */
+  ncm?: string;
+  ufOrigem?: string;
+  ufDestino?: string;
+  codigoServicoMunicipal?: string;
+}
+
+/** Resultado da apuração automática — preenchido por ApuracaoTributariaService antes de contabilizar. */
+export interface ImpostosApurados {
+  icms?: number;
+  pis?: number;
+  cofins?: number;
+  iss?: number;
+  simplesNacionalDas?: number;
 }
 
 /** Retenções na fonte exigidas pelo tomador/comprador (Lei 9.711/98, IN RFB, reforma tributária). */
@@ -71,4 +85,6 @@ export interface DocumentoFiscal {
   itens: ItemDocumentoFiscal[];
   retencoes?: Retencoes;
   centroCustoPadraoId?: string;
+  /** Tributos próprios do EMISSOR sobre a venda/serviço prestado — não confundir com `retencoes` (retenção do tomador/comprador). */
+  impostosApurados?: ImpostosApurados;
 }

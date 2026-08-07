@@ -23,6 +23,15 @@ export enum CategoriaContaFiscal {
   IBS_A_RECUPERAR = "IBS_A_RECUPERAR",
   CBS_A_RECOLHER = "CBS_A_RECOLHER",
   IBS_A_RECOLHER = "IBS_A_RECOLHER",
+  // Apuração automática de tributos sobre venda/serviço prestado (ver
+  // ApuracaoTributariaService e as estratégias de venda/serviço prestado).
+  RECEITA_VENDAS = "RECEITA_VENDAS",
+  RECEITA_SERVICOS = "RECEITA_SERVICOS",
+  CLIENTES_A_RECEBER = "CLIENTES_A_RECEBER",
+  DEDUCOES_TRIBUTARIAS_VENDAS = "DEDUCOES_TRIBUTARIAS_VENDAS",
+  DEDUCOES_TRIBUTARIAS_SERVICOS = "DEDUCOES_TRIBUTARIAS_SERVICOS",
+  ICMS_A_RECOLHER = "ICMS_A_RECOLHER",
+  SIMPLES_NACIONAL_A_RECOLHER = "SIMPLES_NACIONAL_A_RECOLHER",
 }
 
 export interface MapeamentoContabilFiscal {

@@ -1,6 +1,8 @@
 import { ContextoContabilFiscal } from "../../src/fiscal/contexto-contabil-fiscal.service";
 import { ContabilizacaoNfseServicoStrategy } from "../../src/fiscal/strategies/contabilizacao-nfse-servico.strategy";
 import { ContabilizacaoCbsIbsStrategy } from "../../src/fiscal/strategies/contabilizacao-cbs-ibs.strategy";
+import { ContabilizacaoVendaMercadoriaStrategy } from "../../src/fiscal/strategies/contabilizacao-venda-mercadoria.strategy";
+import { ContabilizacaoServicoPrestadoStrategy } from "../../src/fiscal/strategies/contabilizacao-servico-prestado.strategy";
 import {
   CategoriaContaFiscal,
   MapeamentoContabilFiscalInvalidoError,
@@ -129,6 +131,8 @@ describe("Módulo Fiscal — ContextoContabilFiscal (engine/Strategy dispatch)",
   const contexto = new ContextoContabilFiscal(
     new ContabilizacaoNfseServicoStrategy(),
     new ContabilizacaoCbsIbsStrategy(),
+    new ContabilizacaoVendaMercadoriaStrategy(),
+    new ContabilizacaoServicoPrestadoStrategy(),
   );
 
   it("escolhe a estratégia certa por tipo de documento e valida o balanceamento", () => {

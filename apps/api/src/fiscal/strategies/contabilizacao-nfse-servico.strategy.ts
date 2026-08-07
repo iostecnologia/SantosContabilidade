@@ -14,11 +14,13 @@ const TIPOS_SUPORTADOS = new Set([TipoDocumentoFiscal.NFSE_NACIONAL, TipoDocumen
  */
 @Injectable()
 export class ContabilizacaoNfseServicoStrategy implements InterfaceContabilizacaoStrategy {
-  suporta(tipo: TipoDocumentoFiscal): boolean {
-    return TIPOS_SUPORTADOS.has(tipo);
+  suporta(tipo: TipoDocumentoFiscal, natureza: NaturezaOperacaoFiscal): boolean {
+    return TIPOS_SUPORTADOS.has(tipo) && natureza === NaturezaOperacaoFiscal.SERVICO_TOMADO;
   }
 
   gerarLancamento(documento: DocumentoFiscal, mapeamento: MapeamentoContabilFiscal): LancamentoContabilRascunho {
+    // suporta() já filtra isto no despacho normal via ContextoContabilFiscal;
+    // mantido aqui como guarda defensiva para quem chamar a estratégia direto.
     if (documento.naturezaOperacao !== NaturezaOperacaoFiscal.SERVICO_TOMADO) {
       throw new Error(
         `ContabilizacaoNfseServicoStrategy só contabiliza SERVICO_TOMADO; recebido: ${documento.naturezaOperacao}`,

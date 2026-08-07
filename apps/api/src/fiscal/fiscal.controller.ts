@@ -15,13 +15,13 @@ export class FiscalController {
   @Post("lancamentos/preview")
   @RequirePermission("fiscal:create")
   preview(@Body() dto: LancarDocumentoFiscalDto) {
-    return this.fiscalLancamentoService.gerarRascunho(dto.documento, dto.mapeamentoContabil);
+    return this.fiscalLancamentoService.gerarRascunho(dto.documento, dto.mapeamentoContabil ?? {});
   }
 
   /** Gera o rascunho, valida o balanceamento e persiste como lançamento contábil (reference_module = FISCAL). */
   @Post("lancamentos")
   @RequirePermission("fiscal:create")
   lancar(@CurrentUser() user: AuthenticatedUser, @Body() dto: LancarDocumentoFiscalDto) {
-    return this.fiscalLancamentoService.lancar(user.organizationId, user.id, dto.documento, dto.mapeamentoContabil);
+    return this.fiscalLancamentoService.lancar(user.organizationId, user.id, dto.documento, dto.mapeamentoContabil ?? {});
   }
 }

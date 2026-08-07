@@ -6,6 +6,8 @@ import { MapeamentoContabilFiscal } from "./domain/categoria-conta-fiscal";
 import { DesbalanceamentoContabilError } from "./domain/desbalanceamento-contabil.error";
 import { ContabilizacaoNfseServicoStrategy } from "./strategies/contabilizacao-nfse-servico.strategy";
 import { ContabilizacaoCbsIbsStrategy } from "./strategies/contabilizacao-cbs-ibs.strategy";
+import { ContabilizacaoVendaMercadoriaStrategy } from "./strategies/contabilizacao-venda-mercadoria.strategy";
+import { ContabilizacaoServicoPrestadoStrategy } from "./strategies/contabilizacao-servico-prestado.strategy";
 
 /**
  * Motor/Factory do Strategy Pattern: recebe um documento fiscal, encontra a
@@ -18,12 +20,17 @@ import { ContabilizacaoCbsIbsStrategy } from "./strategies/contabilizacao-cbs-ib
 export class ContextoContabilFiscal {
   private readonly estrategias: InterfaceContabilizacaoStrategy[];
 
-  constructor(nfseServico: ContabilizacaoNfseServicoStrategy, cbsIbs: ContabilizacaoCbsIbsStrategy) {
-    this.estrategias = [nfseServico, cbsIbs];
+  constructor(
+    nfseServico: ContabilizacaoNfseServicoStrategy,
+    cbsIbs: ContabilizacaoCbsIbsStrategy,
+    vendaMercadoria: ContabilizacaoVendaMercadoriaStrategy,
+    servicoPrestado: ContabilizacaoServicoPrestadoStrategy,
+  ) {
+    this.estrategias = [nfseServico, cbsIbs, vendaMercadoria, servicoPrestado];
   }
 
   gerarRascunho(documento: DocumentoFiscal, mapeamento: MapeamentoContabilFiscal): LancamentoContabilRascunho {
-    const estrategia = this.estrategias.find((e) => e.suporta(documento.tipo));
+    const estrategia = this.estrategias.find((e) => e.suporta(documento.tipo, documento.naturezaOperacao));
     if (!estrategia) {
       throw new BadRequestException(
         `Não há estratégia de contabilização registrada para o tipo de documento "${documento.tipo}".`,

@@ -34,6 +34,34 @@ export class ItemDocumentoFiscalDto {
   @IsOptional()
   @IsString()
   centroCustoId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  ncm?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  ufOrigem?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  ufDestino?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  codigoServicoMunicipal?: string;
+}
+
+export class ImpostosApuradosDto {
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) icms?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) pis?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) cofins?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) iss?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) simplesNacionalDas?: number;
 }
 
 export class RetencoesDto {
@@ -93,4 +121,9 @@ export class DocumentoFiscalDto {
   @IsOptional()
   @IsString()
   centroCustoPadraoId?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ImpostosApuradosDto)
+  impostosApurados?: ImpostosApuradosDto;
 }

@@ -38,6 +38,8 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   { module: "journal_entries", action: "reverse" },
 
   { module: "fiscal", action: "create" },
+  { module: "fiscal", action: "read" },
+  { module: "fiscal", action: "update_settings" },
 
   { module: "counterparties", action: "create" },
   { module: "counterparties", action: "read" },

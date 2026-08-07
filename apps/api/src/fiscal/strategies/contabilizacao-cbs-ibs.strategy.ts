@@ -22,6 +22,7 @@ const TIPOS_SUPORTADOS = new Set([TipoDocumentoFiscal.CBS, TipoDocumentoFiscal.I
 @Injectable()
 export class ContabilizacaoCbsIbsStrategy implements InterfaceContabilizacaoStrategy {
   suporta(tipo: TipoDocumentoFiscal): boolean {
+    // CBS/IBS retido na fonte se aplica independente da natureza da operação.
     return TIPOS_SUPORTADOS.has(tipo);
   }
 

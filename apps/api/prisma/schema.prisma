@@ -104,6 +104,25 @@ enum TerminationType {
   MUTUAL_AGREEMENT
 }
 
+enum RegimeTributario {
+  SIMPLES_NACIONAL
+  LUCRO_PRESUMIDO
+  LUCRO_REAL
+}
+
+enum AnexoSimplesNacional {
+  I
+  II
+  III
+  IV
+  V
+}
+
+enum PisCofinsRegime {
+  CUMULATIVO
+  NAO_CUMULATIVO
+}
+
 model Organization {
   id        String   @id @default(uuid())
   // Identificador público usado para resolver o tenant no login, antes de
@@ -147,6 +166,10 @@ model Organization {
   thirteenthSalaryRuns          ThirteenthSalaryRun[]
   thirteenthSalaryRunLines      ThirteenthSalaryRunLine[]
   terminations                  Termination[]
+  fiscalTaxSettings             FiscalTaxSettings?
+  simplesNacionalBrackets       SimplesNacionalBracket[]
+  icmsUfRates                   IcmsUfRate[]
+  fiscalDocumentosEmitidos      FiscalDocumentoEmitido[]
 
   @@map("organizations")
 }
@@ -318,6 +341,16 @@ model Account {
   payrollBenefitsPayableSettings        PayrollSettings[]    @relation("PayrollBenefitsPayableAccount")
   payrollFgtsFineExpenseSettings        PayrollSettings[]    @relation("PayrollFgtsFineExpenseAccount")
   payrollFgtsFinePayableSettings        PayrollSettings[]    @relation("PayrollFgtsFinePayableAccount")
+  fiscalReceitaVendasSettings           FiscalTaxSettings[]  @relation("FiscalReceitaVendasAccount")
+  fiscalReceitaServicosSettings         FiscalTaxSettings[]  @relation("FiscalReceitaServicosAccount")
+  fiscalDeducoesVendasSettings          FiscalTaxSettings[]  @relation("FiscalDeducoesVendasAccount")
+  fiscalDeducoesServicosSettings        FiscalTaxSettings[]  @relation("FiscalDeducoesServicosAccount")
+  fiscalClientesReceberSettings         FiscalTaxSettings[]  @relation("FiscalClientesReceberAccount")
+  fiscalIcmsPayableSettings             FiscalTaxSettings[]  @relation("FiscalIcmsPayableAccount")
+  fiscalPisPayableSettings              FiscalTaxSettings[]  @relation("FiscalPisPayableAccount")
+  fiscalCofinsPayableSettings           FiscalTaxSettings[]  @relation("FiscalCofinsPayableAccount")
+  fiscalIssPayableSettings              FiscalTaxSettings[]  @relation("FiscalIssPayableAccount")
+  fiscalSimplesPayableSettings          FiscalTaxSettings[]  @relation("FiscalSimplesPayableAccount")
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -364,6 +397,7 @@ model JournalEntry {
   vacations                     Vacation[]
   thirteenthSalaryRuns          ThirteenthSalaryRun[]
   terminations                  Termination[]
+  fiscalDocumentosEmitidos      FiscalDocumentoEmitido[]
 
   @@unique([organizationId, entryNumber])
   @@index([organizationId, entryDate])
@@ -1100,4 +1134,140 @@ model Termination {
   @@unique([employeeId])
   @@index([organizationId, employeeId])
   @@map("terminations")
+}
+
+// ============================================================================
+// Fiscal — apuração automática de tributos (Simples Nacional / Lucro
+// Presumido / Lucro Real) e emissão de documentos (NF-e/NFS-e)
+// ============================================================================
+// Simplificações assumidas (ver ApuracaoTributariaService para o detalhe):
+// RBT12 é digitado/atualizado manualmente pelo contador, não reconstruído
+// automaticamente do histórico de vendas; ICMS não tem granularidade por
+// NCM/produto nem substituição tributária/redução de base, só uma alíquota
+// interna configurável por UF (a alíquota interestadual usa a matriz fixa
+// da Resolução do Senado 22/89, que não muda, embutida no código); PIS/COFINS
+// usam uma alíquota agregada configurável por regime (cumulativo/não-cumulativo),
+// sem apurar créditos de insumos; ISS usa uma única alíquota por organização,
+// sem tabela por município/serviço. Tabelas do Simples Nacional vêm com
+// valores de referência (Anexo III, o mais comum para serviços) — o mesmo
+// "confira antes de usar" das tabelas de INSS/IRRF do Departamento Pessoal.
+
+model FiscalTaxSettings {
+  id                      String                @id @default(uuid())
+  organizationId          String                @unique @map("organization_id")
+  regimeTributario        RegimeTributario      @map("regime_tributario")
+  anexoSimplesNacional    AnexoSimplesNacional? @map("anexo_simples_nacional")
+  // Receita bruta acumulada nos últimos 12 meses — usada para achar a faixa
+  // do Simples Nacional. Atualizada manualmente pelo contador todo mês.
+  receitaBruta12Meses     Decimal               @default(0) @map("receita_bruta_12_meses") @db.Decimal(18, 2)
+  pisCofinsRegime         PisCofinsRegime?      @map("pis_cofins_regime")
+  pisRate                 Decimal               @default(0) @map("pis_rate") @db.Decimal(5, 4)
+  cofinsRate              Decimal               @default(0) @map("cofins_rate") @db.Decimal(5, 4)
+  issRate                 Decimal               @default(0) @map("iss_rate") @db.Decimal(5, 4)
+  icmsDefaultInternalRate Decimal               @default(0) @map("icms_default_internal_rate") @db.Decimal(5, 4)
+
+  receitaVendasAccountId               String? @map("receita_vendas_account_id")
+  receitaServicosAccountId             String? @map("receita_servicos_account_id")
+  deducoesTributariasVendasAccountId   String? @map("deducoes_tributarias_vendas_account_id")
+  deducoesTributariasServicosAccountId String? @map("deducoes_tributarias_servicos_account_id")
+  clientesAReceberAccountId            String? @map("clientes_a_receber_account_id")
+  icmsPayableAccountId                 String? @map("icms_payable_account_id")
+  pisPayableAccountId                  String? @map("pis_payable_account_id")
+  cofinsPayableAccountId               String? @map("cofins_payable_account_id")
+  issPayableAccountId                  String? @map("iss_payable_account_id")
+  simplesNacionalPayableAccountId      String? @map("simples_nacional_payable_account_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization                       Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  receitaVendasAccount               Account?                 @relation("FiscalReceitaVendasAccount", fields: [receitaVendasAccountId], references: [id], onDelete: Restrict)
+  receitaServicosAccount             Account?                 @relation("FiscalReceitaServicosAccount", fields: [receitaServicosAccountId], references: [id], onDelete: Restrict)
+  deducoesTributariasVendasAccount   Account?                 @relation("FiscalDeducoesVendasAccount", fields: [deducoesTributariasVendasAccountId], references: [id], onDelete: Restrict)
+  deducoesTributariasServicosAccount Account?                 @relation("FiscalDeducoesServicosAccount", fields: [deducoesTributariasServicosAccountId], references: [id], onDelete: Restrict)
+  clientesAReceberAccount            Account?                 @relation("FiscalClientesReceberAccount", fields: [clientesAReceberAccountId], references: [id], onDelete: Restrict)
+  icmsPayableAccount                 Account?                 @relation("FiscalIcmsPayableAccount", fields: [icmsPayableAccountId], references: [id], onDelete: Restrict)
+  pisPayableAccount                  Account?                 @relation("FiscalPisPayableAccount", fields: [pisPayableAccountId], references: [id], onDelete: Restrict)
+  cofinsPayableAccount               Account?                 @relation("FiscalCofinsPayableAccount", fields: [cofinsPayableAccountId], references: [id], onDelete: Restrict)
+  issPayableAccount                  Account?                 @relation("FiscalIssPayableAccount", fields: [issPayableAccountId], references: [id], onDelete: Restrict)
+  simplesNacionalPayableAccount      Account?                 @relation("FiscalSimplesPayableAccount", fields: [simplesNacionalPayableAccountId], references: [id], onDelete: Restrict)
+  simplesBrackets                    SimplesNacionalBracket[]
+  icmsUfRates                        IcmsUfRate[]
+
+  @@map("fiscal_tax_settings")
+}
+
+// Mesmo formato "alíquota efetiva menos parcela a deduzir" das faixas de
+// INSS/IRRF do Departamento Pessoal — aqui aplicado à alíquota efetiva do
+// DAS do Simples Nacional, mais a quebra percentual entre os tributos que o
+// DAS engloba (IRPJ/CSLL/COFINS/PIS/CPP + ICMS-ou-ISS conforme o anexo).
+model SimplesNacionalBracket {
+  id                  String               @id @default(uuid())
+  organizationId      String               @map("organization_id")
+  fiscalTaxSettingsId String               @map("fiscal_tax_settings_id")
+  anexo               AnexoSimplesNacional
+  rbt12Min            Decimal              @map("rbt12_min") @db.Decimal(18, 2)
+  rbt12Max            Decimal?             @map("rbt12_max") @db.Decimal(18, 2)
+  aliquotaNominal     Decimal              @map("aliquota_nominal") @db.Decimal(5, 4)
+  parcelaDeduzir      Decimal              @map("parcela_deduzir") @db.Decimal(18, 2)
+  percentualIrpj      Decimal              @map("percentual_irpj") @db.Decimal(5, 4)
+  percentualCsll      Decimal              @map("percentual_csll") @db.Decimal(5, 4)
+  percentualCofins    Decimal              @map("percentual_cofins") @db.Decimal(5, 4)
+  percentualPis       Decimal              @map("percentual_pis") @db.Decimal(5, 4)
+  percentualCpp       Decimal              @map("percentual_cpp") @db.Decimal(5, 4)
+  percentualIcmsOuIss Decimal              @map("percentual_icms_ou_iss") @db.Decimal(5, 4)
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalTaxSettings FiscalTaxSettings @relation(fields: [fiscalTaxSettingsId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, fiscalTaxSettingsId, anexo])
+  @@map("simples_nacional_brackets")
+}
+
+// Alíquota interna de ICMS por UF (varia por estado, muda de tempos em
+// tempos) — a interestadual usa a matriz fixa da Resolução 22/89, embutida
+// no código, já que não muda desde então.
+model IcmsUfRate {
+  id                  String  @id @default(uuid())
+  organizationId      String  @map("organization_id")
+  fiscalTaxSettingsId String  @map("fiscal_tax_settings_id")
+  uf                  String  @db.Char(2)
+  internalRate        Decimal @map("internal_rate") @db.Decimal(5, 4)
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalTaxSettings FiscalTaxSettings @relation(fields: [fiscalTaxSettingsId], references: [id], onDelete: Cascade)
+
+  @@unique([fiscalTaxSettingsId, uf])
+  @@map("icms_uf_rates")
+}
+
+// Snapshot do documento fiscal emitido — o restante do módulo Fiscal
+// (ContextoContabilFiscal/estratégias) é propositalmente stateless (só gera
+// o lançamento contábil), mas para listar documentos emitidos e regerar o
+// XML depois é preciso guardar o documento em algum lugar. `documentoJson`
+// é a única coluna JSON deste schema de propósito: os itens são uma lista
+// aninhada de tamanho variável que nunca precisa ser filtrada via SQL, só
+// reidratada para reexibição/regeração de XML — as colunas ao lado existem
+// para as consultas/índices que a listagem realmente usa.
+model FiscalDocumentoEmitido {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  tipo             String
+  naturezaOperacao String   @map("natureza_operacao")
+  numeroDocumento  String   @map("numero_documento")
+  dataEmissao      DateTime @map("data_emissao") @db.Date
+  dataCompetencia  DateTime @map("data_competencia") @db.Date
+  contraparteId    String   @map("contraparte_id")
+  valorTotal       Decimal  @map("valor_total") @db.Decimal(18, 2)
+  documentoJson    Json     @map("documento_json")
+  journalEntryId   String   @map("journal_entry_id")
+  createdBy        String   @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, numeroDocumento])
+  @@index([organizationId, dataEmissao])
+  @@map("fiscal_documentos_emitidos")
 }
